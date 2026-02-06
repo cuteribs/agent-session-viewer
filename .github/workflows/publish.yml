@@ -1,0 +1,45 @@
+name: Publish Package
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Shared
+        run: npm run build -w shared
+
+      - name: Build Client
+        run: npm run build -w client
+
+      - name: Build Server
+        run: npm run build -w server
+
+      - name: Prepare Distribution
+        run: |
+          mkdir -p server/dist/public
+          cp -r client/dist/* server/dist/public
+
+      - name: Publish to NPM
+        working-directory: ./server
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
