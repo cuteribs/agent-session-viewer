@@ -14,7 +14,7 @@ A web application for analyzing and visualizing **Claude Code** and **Copilot CL
 You can run the Agent Context Viewer directly without installing it globally using `npx`:
 
 ```bash
-npx agent-context-viewer
+npx @cuteribs/agent-context-viewer
 ```
 
 This will:

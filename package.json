@@ -1,5 +1,5 @@
 {
-  "name": "agent-context-viewer",
+  "name": "@cuteribs/agent-context-viewer",
   "version": "0.1.0",
   "description": "Web application for analyzing Claude Code and Copilot CLI sessions",
   "private": true,
