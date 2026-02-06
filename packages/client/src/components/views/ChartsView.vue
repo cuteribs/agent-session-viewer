@@ -267,11 +267,11 @@ function formatTime(timestamp: string): string {
         <h3 class="text-lg font-semibold mb-4 text-primary">Tool Summary</h3>
         <div class="h-64 overflow-y-auto">
           <table class="w-full">
-            <thead class="bg-tertiary/50 sticky top-0">
+            <thead class="bg-tertiary sticky top-0 z-10">
               <tr>
-                <th class="text-left px-3 py-2 text-sm font-medium text-muted">Tool</th>
-                <th class="text-right px-3 py-2 text-sm font-medium text-muted">Count</th>
-                <th class="text-right px-3 py-2 text-sm font-medium text-muted">Success</th>
+                <th class="bg-tertiary text-left px-3 py-2 text-sm font-medium text-muted">Tool</th>
+                <th class="bg-tertiary text-right px-3 py-2 text-sm font-medium text-muted">Count</th>
+                <th class="bg-tertiary text-right px-3 py-2 text-sm font-medium text-muted">Success</th>
               </tr>
             </thead>
             <tbody>
@@ -319,12 +319,12 @@ function formatTime(timestamp: string): string {
       </h3>
       <div class="overflow-x-auto max-h-96 overflow-y-auto">
         <table class="w-full">
-          <thead class="bg-tertiary/50 sticky top-0">
+          <thead class="bg-tertiary sticky top-0 z-10">
             <tr>
-              <th class="text-left px-4 py-2 text-sm font-medium text-muted">#</th>
-              <th class="text-left px-4 py-2 text-sm font-medium text-muted">Tool</th>
-              <th class="text-left px-4 py-2 text-sm font-medium text-muted">Parameters</th>
-              <th class="text-right px-4 py-2 text-sm font-medium text-muted">Time</th>
+              <th class="bg-tertiary text-left px-4 py-2 text-sm font-medium text-muted">#</th>
+              <th class="bg-tertiary text-left px-4 py-2 text-sm font-medium text-muted">Tool</th>
+              <th class="bg-tertiary text-left px-4 py-2 text-sm font-medium text-muted">Parameters</th>
+              <th class="bg-tertiary text-right px-4 py-2 text-sm font-medium text-muted">Time</th>
             </tr>
           </thead>
           <tbody>
