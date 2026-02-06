@@ -24,22 +24,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Shared
-        run: npm run build -w shared
-
-      - name: Build Client
-        run: npm run build -w client
-
-      - name: Build Server
-        run: npm run build -w server
-
-      - name: Prepare Distribution
+      - name: Build & Publish
         run: |
-          mkdir -p server/dist/public
-          cp -r client/dist/* server/dist/public
-
-      - name: Publish to NPM
-        working-directory: ./server
-        run: npm publish --provenance --access public
+          npm run build
+          npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
