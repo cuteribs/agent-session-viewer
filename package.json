@@ -2,29 +2,20 @@
   "name": "@cuteribs/agent-context-viewer",
   "version": "0.1.0",
   "description": "Web application for analyzing Claude Code and Copilot CLI sessions",
-  "private": true,
+  "type": "module",
+  "bin": {
+    "agent-context-viewer": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
   "workspaces": [
-    "server",
-    "client",
-    "shared"
+    "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:server": "npm run dev -w server",
-    "dev:client": "npm run dev -w client",
-    "build": "npm run build -w shared && npm run build -w server && npm run build -w client",
-    "build:server": "npm run build -w server",
-    "build:client": "npm run build -w client",
-    "start": "npm run start -w server",
-    "typecheck": "npm run typecheck -w shared && npm run typecheck -w server && npm run typecheck -w client"
+    "build": "node build.ts"
   },
-  "devDependencies": {
-    "@types/open": "^6.2.1",
-    "concurrently": "^8.2.2",
-    "tsup": "^8.5.1",
-    "typescript": "^5.9.3"
-  },
-  "engines": {
-    "node": ">=20.0.0"
+  "dependencies": {
+    "open": "^10.0.3"
   }
 }
