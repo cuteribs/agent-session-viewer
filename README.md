@@ -1,4 +1,4 @@
-# Agent session Viewer
+# Agent Session Viewer
 
 A web application for analyzing and visualizing **Claude Code** and **Copilot CLI** sessions. It provides a real-time view of your AI agent interactions, making it easier to debug, understand, and review the context of your coding sessions.
 
