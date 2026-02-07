@@ -32,6 +32,7 @@ jobs:
           cp -r dist/* ../../packages/server/dist/public/
 
           cd ../../packages/server
+          ls -R dist
           cp ../../README.md ./
           npm pack
           npm publish

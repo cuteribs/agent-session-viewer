@@ -1,6 +1,6 @@
 {
   "name": "@cuteribs/agent-session-viewer",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Web application for analyzing Claude Code and Copilot CLI sessions",
   "repository": {
     "type": "git",
