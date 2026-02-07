@@ -25,12 +25,14 @@ jobs:
         run: |
           cd packages/server
           npm install && npm run build
+          mkdir dist/public
 
           cd ../../packages/client
           npm install && npm run build
-          cp -r dist ../../packages/server/dist/public
+          cp -r dist/* ../../packages/server/dist/public/
 
           cd ../../packages/server
+          cp ../../README.md ./
           npm pack
           npm publish --access public
         env:
