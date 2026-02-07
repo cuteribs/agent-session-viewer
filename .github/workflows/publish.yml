@@ -32,6 +32,6 @@ jobs:
 
           cd ../../packages/server
           npm pack
-          npm publish --provenance --access public
+          npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
