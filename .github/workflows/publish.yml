@@ -34,6 +34,6 @@ jobs:
           cd ../../packages/server
           cp ../../README.md ./
           npm pack
-          npm publish --access public
+          npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
