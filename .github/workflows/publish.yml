@@ -36,7 +36,7 @@ jobs:
           cp ../../README.md ./
           npm pack
           mkdir tar
-          cp ./*.tgz tar/
+          cp ./cuteribs-agent-session-viewer-* tar/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -45,4 +45,6 @@ jobs:
           path: tar/
 
       - name: Publish
-        run: npm publish *.tgz
+        run: |
+          cd packages/server/tar
+          npm publish *.tgz
