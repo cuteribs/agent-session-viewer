@@ -27,11 +27,11 @@ jobs:
           npm install && npm run build
           mkdir dist/public
 
-          cd ../../packages/client
+          cd ../client
           npm install && npm run build
-          cp -r dist/* ../../packages/server/dist/public/
+          cp -r dist/. ../server/dist/public/
 
-          cd ../../packages/server
+          cd ../server
           ls -R dist
           cp ../../README.md ./
           npm pack
