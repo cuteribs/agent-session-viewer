@@ -34,13 +34,15 @@ jobs:
           cd ../server
           ls -R dist
           cp ../../README.md ./
-          npm pack          
+          npm pack
+          mkdir tar
+          cp ./*.tgz tar/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: rtcping-${{ matrix.os }}-${{ matrix.arch }}
-          path: *.tgz
+          path: tar/
 
       - name: Publish
         run: npm publish *.tgz
