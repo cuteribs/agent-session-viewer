@@ -23,8 +23,15 @@ jobs:
 
       - name: Build & Publish
         run: |
-          npm install
-          npm run build
+          cd packages/server
+          npm install && npm run build
+
+          cd ../../packages/client
+          npm install && npm run build
+          cp -r dist ../../packages/server/dist/public
+
+          cd ../../packages/server
+          npm pack
           npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

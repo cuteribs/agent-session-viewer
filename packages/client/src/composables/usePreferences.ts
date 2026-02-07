@@ -1,7 +1,7 @@
 import { ref, watch } from 'vue'
 import type { ViewMode, ListViewMode } from '../types'
 
-const PREFS_KEY = 'agent-context-viewer-prefs'
+const PREFS_KEY = 'agent-session-viewer-prefs'
 
 interface Preferences {
   listViewMode: ListViewMode

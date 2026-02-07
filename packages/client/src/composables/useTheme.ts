@@ -1,7 +1,7 @@
 import { ref, computed, watch } from 'vue'
 import type { Theme } from '../types'
 
-const THEME_KEY = 'agent-context-viewer-theme'
+const THEME_KEY = 'agent-session-viewer-theme'
 
 const theme = ref<Theme>('system')
 

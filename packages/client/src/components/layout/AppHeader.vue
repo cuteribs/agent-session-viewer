@@ -25,7 +25,7 @@ const sessionsStore = useSessionsStore()
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9h8" />
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 13h6" />
       </svg>
-      <h1 class="text-lg font-semibold text-primary hidden sm:block">Agent Context Viewer</h1>
+      <h1 class="text-lg font-semibold text-primary hidden sm:block">Agent Session Viewer</h1>
     </div>
 
     <!-- Search -->

@@ -128,7 +128,7 @@ onUnmounted(() => {
             <div>
               <h3 class="text-sm font-medium text-primary mb-3">About</h3>
               <div class="text-sm text-secondary space-y-1">
-                <p>Agent Context Viewer v1.0.0</p>
+                <p>Agent Session Viewer v1.0.0</p>
                 <p class="text-xs text-muted">
                   Analyze and visualize Claude Code and Copilot CLI sessions.
                 </p>

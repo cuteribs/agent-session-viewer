@@ -1,4 +1,4 @@
-# Agent Context Viewer
+# Agent session Viewer
 
 A web application for analyzing and visualizing **Claude Code** and **Copilot CLI** sessions. It provides a real-time view of your AI agent interactions, making it easier to debug, understand, and review the context of your coding sessions.
 
@@ -11,10 +11,10 @@ A web application for analyzing and visualizing **Claude Code** and **Copilot CL
 
 ## Quick Start
 
-You can run the Agent Context Viewer directly without installing it globally using `npx`:
+You can run the Agent Session Viewer directly without installing it globally using `npx`:
 
 ```bash
-npx @cuteribs/agent-context-viewer
+npx @cuteribs/agent-session-viewer
 ```
 
 This will:

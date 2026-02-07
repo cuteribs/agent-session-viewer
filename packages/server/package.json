@@ -1,10 +1,11 @@
 {
-  "name": "server",
-  "version": "1.0.0",
+  "name": "@cuteribs/agent-session-viewer",
+  "version": "0.1.1",
+  "description": "Web application for analyzing Claude Code and Copilot CLI sessions",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "agent-context-viewer": "./dist/index.js"
+    "agent-session-viewer": "./dist/index.js"
   },
   "files": [
     "dist"
@@ -22,18 +23,18 @@
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
-    "ws": "^8.16.0",
+    "open": "^10.0.3",
     "shared": "*",
-    "open": "^10.0.3"
+    "ws": "^8.16.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^20.10.6",
     "@types/ws": "^8.5.10",
-    "tsx": "^4.7.0",
-    "typescript": "^5.9.3",
+    "copyfiles": "^2.4.1",
     "tsup": "^8.5.1",
-    "copyfiles": "^2.4.1"
+    "tsx": "^4.7.0",
+    "typescript": "^5.9.3"
   }
 }
