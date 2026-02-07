@@ -32,7 +32,6 @@ jobs:
           cp -r dist/. ../server/dist/public/
 
           cd ../server
-          ls -R dist
           cp ../../README.md ./
           npm pack
           mkdir tar
@@ -42,7 +41,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: rtcping-${{ matrix.os }}-${{ matrix.arch }}
-          path: tar/
+          path: packages/server/tar/
 
       - name: Publish
         run: |
