@@ -10,5 +10,5 @@ export interface ParsedSession {
 export interface FileWatchEvent {
   type: 'add' | 'change' | 'unlink';
   path: string;
-  source: 'claude' | 'copilot';
+  source: 'claude' | 'copilot' | 'codex';
 }

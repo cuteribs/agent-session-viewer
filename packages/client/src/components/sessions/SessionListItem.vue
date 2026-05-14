@@ -53,7 +53,7 @@ function cancelDelete() {
             <span
               :class="[
                 'w-2 h-2 rounded-full flex-shrink-0',
-                session.source === 'claude' ? 'bg-orange-500' : 'bg-purple-500'
+                session.source === 'claude' ? 'bg-orange-500' : session.source === 'codex' ? 'bg-blue-500' : 'bg-purple-500'
               ]"
             />
             <span class="font-medium text-primary truncate">

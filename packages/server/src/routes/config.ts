@@ -35,6 +35,7 @@ configRouter.get('/paths', (_req, res) => {
     res.json({
       claude: config.paths.claude,
       copilot: config.paths.copilot,
+      codex: config.paths.codex,
     });
   } catch (error) {
     console.error('Error getting paths:', error);
@@ -50,10 +51,12 @@ configRouter.post('/paths/scan', (_req, res) => {
     // Filter to only existing paths
     const claudePaths = config.paths.claude.filter(p => existsSync(p));
     const copilotPaths = config.paths.copilot.filter(p => existsSync(p));
+    const codexPaths = config.paths.codex.filter(p => existsSync(p));
 
     res.json({
       claude: claudePaths,
       copilot: copilotPaths,
+      codex: codexPaths,
     });
   } catch (error) {
     console.error('Error scanning paths:', error);

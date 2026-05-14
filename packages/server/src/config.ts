@@ -13,6 +13,10 @@ function getDefaultCopilotPath(): string {
   return join(homedir(), '.copilot', 'session-state');
 }
 
+function getDefaultCodexPath(): string {
+  return join(homedir(), '.codex', 'sessions');
+}
+
 function parsePathList(envValue: string | undefined, defaultPath: string): string[] {
   if (!envValue || envValue.trim() === '') {
     return [defaultPath];
@@ -28,6 +32,7 @@ export interface ServerConfig {
   paths: {
     claude: string[];
     copilot: string[];
+    codex: string[];
   };
 }
 
@@ -40,6 +45,7 @@ export function getServerConfig(): ServerConfig {
     paths: {
       claude: parsePathList(process.env.CLAUDE_PATHS, getDefaultClaudePath()),
       copilot: parsePathList(process.env.COPILOT_PATHS, getDefaultCopilotPath()),
+      codex: parsePathList(process.env.CODEX_PATHS, getDefaultCodexPath()),
     },
   };
 }
@@ -48,6 +54,7 @@ let appConfig: AppConfig = {
   paths: {
     claude: getServerConfig().paths.claude,
     copilot: getServerConfig().paths.copilot,
+    codex: getServerConfig().paths.codex,
   },
   autoRefresh: true,
   refreshInterval: 5000,

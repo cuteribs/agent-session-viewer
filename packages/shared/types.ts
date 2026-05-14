@@ -2,6 +2,83 @@
 // Raw Data Schemas (from session files)
 // ============================================
 
+export interface CodexEvent {
+  timestamp: string;
+  type: 'session_meta' | 'event_msg' | 'response_item' | 'turn_context';
+  payload: CodexSessionMeta | CodexEventMsg | CodexResponseItem | CodexTurnContext;
+}
+
+export interface CodexSessionMeta {
+  id: string;
+  timestamp: string;
+  cwd: string;
+  originator?: string;
+  cli_version?: string;
+  source?: string;
+  model_provider?: string;
+}
+
+export interface CodexEventMsg {
+  type:
+    | 'user_message'
+    | 'agent_message'
+    | 'task_started'
+    | 'task_complete'
+    | 'token_count'
+    | 'patch_apply_end'
+    | 'turn_aborted';
+  // user_message
+  message?: string;
+  // agent_message
+  phase?: 'commentary' | 'final' | 'final_answer';
+  // task_started
+  turn_id?: string;
+  model_context_window?: number;
+  // task_complete
+  duration_ms?: number;
+  // token_count
+  info?: {
+    total_token_usage?: CodexTokenUsage;
+    last_token_usage?: CodexTokenUsage;
+    model_context_window?: number;
+  };
+  // patch_apply_end
+  call_id?: string;
+  success?: boolean;
+  stdout?: string;
+  stderr?: string;
+}
+
+export interface CodexTokenUsage {
+  input_tokens: number;
+  cached_input_tokens: number;
+  output_tokens: number;
+  reasoning_output_tokens?: number;
+  total_tokens: number;
+}
+
+export interface CodexResponseItem {
+  type: 'function_call' | 'function_call_output' | 'custom_tool_call' | 'custom_tool_call_output' | 'message' | 'reasoning';
+  // function_call / custom_tool_call
+  name?: string;
+  arguments?: string;
+  input?: string;
+  call_id?: string;
+  // function_call_output / custom_tool_call_output
+  output?: string;
+  // message
+  role?: string;
+  content?: Array<{ type: string; text?: string }>;
+  phase?: string;
+}
+
+export interface CodexTurnContext {
+  turn_id: string;
+  cwd: string;
+  model?: string;
+  effort?: string;
+}
+
 export interface ClaudeCodeEntry {
   type: 'user' | 'assistant' | 'system' | 'file-history-snapshot';
   uuid: string;
@@ -100,7 +177,7 @@ export interface ToolRequest {
 
 export interface SessionSummary {
   id: string;
-  source: 'claude' | 'copilot';
+  source: 'claude' | 'copilot' | 'codex';
   project: string;
   projectPath: string;
   startTime: string;
@@ -186,6 +263,7 @@ export interface AppConfig {
   paths: {
     claude: string[];
     copilot: string[];
+    codex: string[];
   };
   autoRefresh: boolean;
   refreshInterval: number;
@@ -200,7 +278,7 @@ export interface AppConfig {
 export interface WSMessage {
   type: 'session_updated' | 'session_created' | 'session_deleted';
   payload: {
-    source: 'claude' | 'copilot';
+    source: 'claude' | 'copilot' | 'codex';
     sessionId: string;
     data?: SessionSummary;
   };
@@ -213,6 +291,7 @@ export interface WSMessage {
 export interface PathsResponse {
   claude: string[];
   copilot: string[];
+  codex: string[];
 }
 
 export interface ApiError {

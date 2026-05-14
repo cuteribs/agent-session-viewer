@@ -18,17 +18,17 @@ async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 // Sessions API
-export async function fetchSessions(source?: 'claude' | 'copilot' | 'all') {
+export async function fetchSessions(source?: 'claude' | 'copilot' | 'codex' | 'all') {
   const query = source ? `?source=${source}` : '';
   return fetchJSON<import('shared/types').SessionSummary[]>(`/sessions${query}`);
 }
 
-export async function fetchSession(source: 'claude' | 'copilot', sessionId: string) {
+export async function fetchSession(source: 'claude' | 'copilot' | 'codex', sessionId: string) {
   return fetchJSON<import('shared/types').SessionDetail>(`/sessions/${source}/${sessionId}`);
 }
 
 export async function fetchSessionMessages(
-  source: 'claude' | 'copilot',
+  source: 'claude' | 'copilot' | 'codex',
   sessionId: string,
   offset = 0,
   limit = 50
@@ -38,7 +38,7 @@ export async function fetchSessionMessages(
   );
 }
 
-export async function fetchSessionStats(source: 'claude' | 'copilot', sessionId: string) {
+export async function fetchSessionStats(source: 'claude' | 'copilot' | 'codex', sessionId: string) {
   return fetchJSON<import('shared/types').SessionStats>(`/sessions/${source}/${sessionId}/stats`);
 }
 
@@ -66,7 +66,7 @@ export async function scanPaths() {
 
 // Export API
 export function getExportURL(
-  source: 'claude' | 'copilot',
+  source: 'claude' | 'copilot' | 'codex',
   sessionId: string,
   format: 'csv' | 'json' | 'summary'
 ) {
@@ -74,7 +74,7 @@ export function getExportURL(
 }
 
 // Session deletion
-export async function deleteSession(source: 'claude' | 'copilot', sessionId: string) {
+export async function deleteSession(source: 'claude' | 'copilot' | 'codex', sessionId: string) {
   return fetchJSON<{ success: boolean; message: string }>(
     `/sessions/${source}/${sessionId}`,
     { method: 'DELETE' }

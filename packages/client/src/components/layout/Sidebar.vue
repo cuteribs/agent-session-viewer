@@ -39,7 +39,7 @@ function stopResize() {
     <!-- Filter tabs -->
     <div class="flex border-b border-default">
       <button
-        v-for="filter in ['all', 'claude', 'copilot'] as const"
+        v-for="filter in ['all', 'claude', 'copilot', 'codex'] as const"
         :key="filter"
         @click="sessionsStore.setSourceFilter(filter)"
         :class="[

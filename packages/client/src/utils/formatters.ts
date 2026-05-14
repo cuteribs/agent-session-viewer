@@ -86,12 +86,16 @@ export function truncateText(text: string, maxLength: number): string {
   return text.slice(0, maxLength - 3) + '...';
 }
 
-export function getSourceColor(source: 'claude' | 'copilot'): string {
-  return source === 'claude' ? 'text-orange-500' : 'text-purple-500';
+export function getSourceColor(source: 'claude' | 'copilot' | 'codex'): string {
+  if (source === 'claude') return 'text-orange-500';
+  if (source === 'codex') return 'text-blue-500';
+  return 'text-purple-500';
 }
 
-export function getSourceBgColor(source: 'claude' | 'copilot'): string {
-  return source === 'claude' ? 'bg-orange-500' : 'bg-purple-500';
+export function getSourceBgColor(source: 'claude' | 'copilot' | 'codex'): string {
+  if (source === 'claude') return 'bg-orange-500';
+  if (source === 'codex') return 'bg-blue-500';
+  return 'bg-purple-500';
 }
 
 export function getRoleColor(role: string): string {

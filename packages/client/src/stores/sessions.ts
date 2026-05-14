@@ -10,7 +10,7 @@ export const useSessionsStore = defineStore('sessions', () => {
   const currentSession = ref<SessionDetail | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
-  const sourceFilter = ref<'all' | 'claude' | 'copilot'>('all')
+  const sourceFilter = ref<'all' | 'claude' | 'copilot' | 'codex'>('all')
   const searchQuery = ref('')
   const activeView = ref<ViewMode>('timeline')
   const previewMessage = ref<Message | null>(null)
@@ -82,7 +82,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     }
   }
 
-  async function selectSession(source: 'claude' | 'copilot', sessionId: string) {
+  async function selectSession(source: 'claude' | 'copilot' | 'codex', sessionId: string) {
     loading.value = true
     error.value = null
     try {
@@ -98,7 +98,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     currentSession.value = null
   }
 
-  function setSourceFilter(filter: 'all' | 'claude' | 'copilot') {
+  function setSourceFilter(filter: 'all' | 'claude' | 'copilot' | 'codex') {
     sourceFilter.value = filter
     loadSessions()
   }
@@ -127,7 +127,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     showSettings.value = false
   }
 
-  async function removeSession(source: 'claude' | 'copilot', sessionId: string) {
+  async function removeSession(source: 'claude' | 'copilot' | 'codex', sessionId: string) {
     loading.value = true
     error.value = null
     try {
@@ -185,7 +185,7 @@ export const useSessionsStore = defineStore('sessions', () => {
               currentSession.value.source === msg.payload.source
             ) {
               console.log('Reloading current session due to update')
-              selectSession(msg.payload.source, msg.payload.sessionId)
+              selectSession(msg.payload.source as 'claude' | 'copilot' | 'codex', msg.payload.sessionId)
             }
           }
           break

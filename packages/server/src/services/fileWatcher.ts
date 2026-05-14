@@ -15,6 +15,7 @@ export function initFileWatcher(broadcast: BroadcastFn): void {
   const watchPaths = [
     ...config.paths.claude.map(p => `${p}/**/*.jsonl`),
     ...config.paths.copilot.map(p => `${p}/**/events.jsonl`),
+    ...config.paths.codex.map(p => `${p}/**/*.jsonl`),
   ];
 
   console.log('Initializing file watcher for:', watchPaths);
@@ -110,12 +111,21 @@ function determineSource(
     }
   }
 
+  for (const codexPath of config.paths.codex) {
+    if (normalizedPath.includes(codexPath.replace(/\\/g, '/'))) {
+      return 'codex';
+    }
+  }
+
   // Fallback: check path patterns
   if (normalizedPath.includes('.claude/projects')) {
     return 'claude';
   }
   if (normalizedPath.includes('.copilot/session-state')) {
     return 'copilot';
+  }
+  if (normalizedPath.includes('.codex/sessions')) {
+    return 'codex';
   }
 
   return null;
@@ -124,6 +134,9 @@ function determineSource(
 function extractSessionId(filePath: string, source: SessionSource): string | null {
   if (source === 'claude') {
     // Claude: /{project}/{sessionId}.jsonl
+    return basename(filePath, '.jsonl');
+  } else if (source === 'codex') {
+    // Codex: /{year}/{month}/{day}/{name}.jsonl
     return basename(filePath, '.jsonl');
   } else {
     // Copilot: /{sessionId}/events.jsonl

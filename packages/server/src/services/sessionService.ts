@@ -1,4 +1,4 @@
-import { readdirSync, statSync, existsSync } from 'fs';
+import { readdirSync, statSync, existsSync, openSync, readSync, closeSync } from 'fs';
 import { join, basename } from 'path';
 import { getServerConfig } from '../config.js';
 import { parseSessionFile, getSessionSummary, type SessionSource } from '../parsers/index.js';
@@ -21,7 +21,12 @@ export function invalidateSession(source: SessionSource, sessionId: string): voi
 
 export function findSessionFiles(source: SessionSource): Map<string, string> {
   const config = getServerConfig();
-  const paths = source === 'claude' ? config.paths.claude : config.paths.copilot;
+  const paths =
+    source === 'claude'
+      ? config.paths.claude
+      : source === 'copilot'
+        ? config.paths.copilot
+        : config.paths.codex;
   const files = new Map<string, string>();
 
   for (const basePath of paths) {
@@ -32,9 +37,12 @@ export function findSessionFiles(source: SessionSource): Map<string, string> {
     if (source === 'claude') {
       // Claude: ~/.claude/projects/{encoded-project-path}/*.jsonl
       findClaudeSessionFiles(basePath, files);
-    } else {
+    } else if (source === 'copilot') {
       // Copilot: ~/.copilot/session-state/{session-id}/events.jsonl
       findCopilotSessionFiles(basePath, files);
+    } else {
+      // Codex: ~/.codex/sessions/{year}/{month}/{day}/*.jsonl
+      findCodexSessionFiles(basePath, files);
     }
   }
 
@@ -88,10 +96,52 @@ function findCopilotSessionFiles(basePath: string, files: Map<string, string>): 
   }
 }
 
-export function listSessions(source?: 'claude' | 'copilot' | 'all'): SessionSummary[] {
+function findCodexSessionFiles(basePath: string, files: Map<string, string>): void {
+  // Codex: ~/.codex/sessions/{year}/{month}/{day}/{name}.jsonl
+  // The filename has a prefix before the UUID; read first line to get actual session ID.
+  function scanDir(dir: string, depth: number): void {
+    if (depth > 4) return;
+    try {
+      const entries = readdirSync(dir);
+      for (const entry of entries) {
+        const fullPath = join(dir, entry);
+        const stat = statSync(fullPath);
+        if (stat.isDirectory()) {
+          scanDir(fullPath, depth + 1);
+        } else if (entry.endsWith('.jsonl')) {
+          const sessionId = extractCodexSessionId(fullPath) || basename(entry, '.jsonl');
+          files.set(sessionId, fullPath);
+        }
+      }
+    } catch {
+      // Skip unreadable dirs
+    }
+  }
+  scanDir(basePath, 0);
+}
+
+function extractCodexSessionId(filePath: string): string | null {
+  try {
+    // Read only the first 256 bytes - the session ID appears early in session_meta line
+    const fd = openSync(filePath, 'r');
+    const buf = Buffer.alloc(256);
+    const bytesRead = readSync(fd, buf, 0, 256, 0);
+    closeSync(fd);
+    const chunk = buf.toString('utf-8', 0, bytesRead);
+    // Only extract from session_meta lines; match uuid-shaped id value
+    if (!chunk.includes('"session_meta"')) return null;
+    const match = chunk.match(/"id"\s*:\s*"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"/i);
+    if (match) return match[1];
+  } catch {
+    // Fall back to filename-based id
+  }
+  return null;
+}
+
+export function listSessions(source?: 'claude' | 'copilot' | 'codex' | 'all'): SessionSummary[] {
   const sessions: SessionSummary[] = [];
   const sources: SessionSource[] =
-    source === 'all' || !source ? ['claude', 'copilot'] : [source];
+    source === 'all' || !source ? ['claude', 'copilot', 'codex'] : [source];
 
   for (const src of sources) {
     const files = findSessionFiles(src);
