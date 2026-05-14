@@ -65,7 +65,7 @@ export interface CodexResponseItem {
   input?: string;
   call_id?: string;
   // function_call_output / custom_tool_call_output
-  output?: string;
+  output?: string | unknown;
   // message
   role?: string;
   content?: Array<{ type: string; text?: string }>;

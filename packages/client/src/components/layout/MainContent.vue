@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useSessionsStore } from '@/stores/sessions'
-import { formatDateTime, formatTokens, formatDuration } from '@/utils/formatters'
+import { formatDateTime, formatDuration } from '@/utils/formatters'
 import { getExportURL } from '@/utils/api'
 import TimelineView from '@/components/views/TimelineView.vue'
 import ChartsView from '@/components/views/ChartsView.vue'
@@ -53,14 +53,21 @@ function handleExport(format: 'csv' | 'json') {
               <span
                 :class="[
                   'px-2 py-0.5 text-xs font-medium rounded-full text-white',
-                  session.source === 'claude' ? 'bg-orange-500' : 'bg-purple-500'
+                  session.source === 'claude' ? 'bg-orange-500' :
+                  session.source === 'codex' ? 'bg-blue-500' : 'bg-purple-500'
                 ]"
               >
                 {{ session.source }}
               </span>
               <h2 class="text-lg font-semibold text-primary">{{ session.project }}</h2>
             </div>
-            <p class="text-sm text-muted mt-1">{{ session.projectPath }}</p>
+            <p class="text-sm text-muted mt-1 flex items-center gap-2">
+              <span>{{ session.projectPath }}</span>
+              <span class="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                <span class="opacity-70">ID</span>
+                {{ session.id }}
+              </span>
+            </p>
           </div>
 
           <!-- Export buttons -->

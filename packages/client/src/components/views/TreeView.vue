@@ -171,7 +171,15 @@ function getRoleColor(role: string): string {
               </span>
             </div>
             <p class="text-sm text-primary mt-1 truncate">
-              {{ node.message.content.substring(0, 100) || '(no content)' }}{{ node.message.content.length > 100 ? '...' : '' }}
+              <template v-if="node.message.content">
+                {{ node.message.content.substring(0, 100) }}{{ node.message.content.length > 100 ? '...' : '' }}
+              </template>
+              <template v-else-if="node.message.toolCalls && node.message.toolCalls.length > 0">
+                <span class="text-yellow-600 dark:text-yellow-400">{{ node.message.toolCalls.map(t => t.name).join(', ') }}</span>
+              </template>
+              <template v-else>
+                <span class="text-muted italic">(no content)</span>
+              </template>
             </p>
           </div>
         </div>

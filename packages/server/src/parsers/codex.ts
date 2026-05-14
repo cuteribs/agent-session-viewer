@@ -85,10 +85,15 @@ export function parseCodexSessionFile(filePath: string): SessionDetail | null {
         const callId = item.call_id || '';
         const toolName = toolCallsByCallId.get(callId)?.name || 'unknown';
         const success = true; // Codex doesn't track explicit failure in output events
+        const rawOutput = item.output;
+        const outputStr =
+          rawOutput == null ? '' :
+          typeof rawOutput === 'string' ? rawOutput :
+          JSON.stringify(rawOutput, null, 2);
         toolResultsByCallId.set(callId, {
           toolCallId: callId,
           success,
-          content: item.output || '',
+          content: outputStr,
         });
 
         const existing = toolUsageMap.get(toolName) || { count: 0, successes: 0 };

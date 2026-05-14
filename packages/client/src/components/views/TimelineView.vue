@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useSessionsStore } from '@/stores/sessions'
 import { formatTime, truncateText, getRoleColor, formatTokens } from '@/utils/formatters'
-import type { SessionDetail, Message } from '@/types'
+import type { SessionDetail, Message, ToolCall } from '@/types'
 import { watch, nextTick, computed } from 'vue'
 
 const props = defineProps<{
@@ -29,6 +29,29 @@ watch(() => sessionsStore.selectedMessageIndex, async (newIndex) => {
 
 function openPreview(message: Message) {
   sessionsStore.openPreview(message)
+}
+
+/** Group tool calls by name, preserving call order within each group. */
+function groupToolCalls(toolCalls: ToolCall[]): { name: string; calls: ToolCall[] }[] {
+  const map = new Map<string, ToolCall[]>()
+  for (const call of toolCalls) {
+    if (!map.has(call.name)) map.set(call.name, [])
+    map.get(call.name)!.push(call)
+  }
+  return Array.from(map.entries()).map(([name, calls]) => ({ name, calls }))
+}
+
+/** Return a compact one-line summary of tool arguments. */
+function summarizeArgs(args: Record<string, unknown>): string {
+  const PRIORITY_KEYS = ['command', 'cmd', 'input', 'path', 'file_path', 'filepath', 'query', 'url', 'content']
+  for (const key of PRIORITY_KEYS) {
+    if (key in args && args[key] !== undefined && args[key] !== null) {
+      const val = String(args[key])
+      return val.length > 120 ? val.substring(0, 120) + '…' : val
+    }
+  }
+  const json = JSON.stringify(args)
+  return json.length > 120 ? json.substring(0, 120) + '…' : json
 }
 </script>
 
@@ -79,24 +102,40 @@ function openPreview(message: Message) {
 
       <!-- Message content -->
       <div class="px-4 py-3">
-        <p class="text-sm text-primary whitespace-pre-wrap break-words">
-          {{ truncateText(message.content, 500) || '(no text content)' }}
+        <p v-if="message.content" class="text-sm text-primary whitespace-pre-wrap break-words">
+          {{ truncateText(message.content, 500) }}
+        </p>
+        <p v-else-if="!message.toolCalls?.length && !message.toolResult" class="text-sm text-muted italic">
+          (no content)
         </p>
 
-        <!-- Tool calls indicator -->
-        <div v-if="message.toolCalls && message.toolCalls.length > 0" class="mt-3">
-          <div class="flex flex-wrap gap-2">
-            <span
-              v-for="tool in message.toolCalls"
-              :key="tool.id"
-              class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 rounded"
-            >
-              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <!-- Tool calls grouped by name -->
+        <div v-if="message.toolCalls && message.toolCalls.length > 0" class="mt-3 space-y-2">
+          <div
+            v-for="group in groupToolCalls(message.toolCalls)"
+            :key="group.name"
+            class="rounded border border-yellow-200 dark:border-yellow-800 overflow-hidden"
+          >
+            <!-- Group header -->
+            <div class="flex items-center gap-1.5 px-2 py-1 bg-yellow-50 dark:bg-yellow-900/20">
+              <svg class="w-3 h-3 text-yellow-600 dark:text-yellow-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              {{ tool.name }}
-            </span>
+              <span class="text-xs font-semibold text-yellow-800 dark:text-yellow-300">{{ group.name }}</span>
+              <span v-if="group.calls.length > 1" class="text-xs text-yellow-600 dark:text-yellow-500 ml-auto">×{{ group.calls.length }}</span>
+            </div>
+            <!-- Each call's argument summary -->
+            <div class="divide-y divide-yellow-100 dark:divide-yellow-900/30">
+              <p
+                v-for="call in group.calls"
+                :key="call.id"
+                class="px-2 py-1 text-xs font-mono text-secondary truncate"
+                :title="summarizeArgs(call.arguments)"
+              >
+                {{ summarizeArgs(call.arguments) }}
+              </p>
+            </div>
           </div>
         </div>
 
