@@ -10,6 +10,7 @@ import type {
   SessionStats,
   ToolUsageSummary,
 } from '../types/index.js';
+import { calculateCost } from '../pricing.js';
 
 export function parseClaudeSessionFile(filePath: string): SessionDetail | null {
   try {
@@ -46,6 +47,7 @@ export function parseClaudeSessionFile(filePath: string): SessionDetail | null {
     let totalOutputTokens = 0;
     let totalCacheRead = 0;
     let totalCacheCreation = 0;
+    let totalCost = 0;
     const inputPerMessage: number[] = [];
     const outputPerMessage: number[] = [];
     const cumulativeTokens: number[] = [];
@@ -89,6 +91,15 @@ export function parseClaudeSessionFile(filePath: string): SessionDetail | null {
             output: message.usage.output_tokens,
             cacheRead: message.usage.cache_read_input_tokens,
             cacheCreation: message.usage.cache_creation_input_tokens,
+            cost: calculateCost(
+              {
+                input: message.usage.input_tokens,
+                output: message.usage.output_tokens,
+                cacheRead: message.usage.cache_read_input_tokens,
+                cacheCreation: message.usage.cache_creation_input_tokens,
+              },
+              message.model ?? model
+            ),
           }
         : undefined;
 
@@ -97,6 +108,7 @@ export function parseClaudeSessionFile(filePath: string): SessionDetail | null {
         totalOutputTokens += tokens.output;
         totalCacheRead += tokens.cacheRead || 0;
         totalCacheCreation += tokens.cacheCreation || 0;
+        totalCost += tokens.cost ?? 0;
         inputPerMessage.push(tokens.input);
         outputPerMessage.push(tokens.output);
         cumulativeTotal += tokens.input + tokens.output;
@@ -145,6 +157,7 @@ export function parseClaudeSessionFile(filePath: string): SessionDetail | null {
         totalOutput: totalOutputTokens,
         totalCacheRead,
         totalCacheCreation,
+        totalCost,
         inputPerMessage,
         outputPerMessage,
         cumulativeTokens,

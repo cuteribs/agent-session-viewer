@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useSessionsStore } from '@/stores/sessions'
-import { formatDateTime, formatDuration } from '@/utils/formatters'
+import { formatDateTime, formatDuration, formatCost } from '@/utils/formatters'
 import { getExportURL } from '@/utils/api'
 import TimelineView from '@/components/views/TimelineView.vue'
 import ChartsView from '@/components/views/ChartsView.vue'
@@ -108,6 +108,16 @@ function handleExport(format: 'csv' | 'json') {
           <div class="flex items-center gap-1">
             <span class="text-muted">Started:</span>
             <span class="font-medium">{{ formatDateTime(session.startTime) }}</span>
+          </div>
+          <!-- Session cost subtotal -->
+          <div v-if="session.stats.tokens?.totalCost != null && session.stats.tokens.totalCost > 0" class="flex items-center gap-1">
+            <span class="text-muted">Cost:</span>
+            <span
+              class="font-semibold text-green-700 dark:text-green-400"
+              :title="session.source === 'copilot' ? 'Estimated cost (input tokens estimated from conversation size)' : 'Cost based on exact token counts'"
+            >
+              <span v-if="session.source === 'copilot'" class="text-xs font-normal opacity-70">~</span>{{ formatCost(session.stats.tokens.totalCost) }}
+            </span>
           </div>
         </div>
       </div>

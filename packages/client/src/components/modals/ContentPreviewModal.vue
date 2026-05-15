@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { useSessionsStore } from '@/stores/sessions'
-import { formatDateTime, formatNumber } from '@/utils/formatters'
+import { formatDateTime, formatNumber, formatCost } from '@/utils/formatters'
 import TokenBadge from '@/components/common/TokenBadge.vue'
 
 const sessionsStore = useSessionsStore()
@@ -116,10 +116,27 @@ onUnmounted(() => {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
               </svg>
               Tokens
+              <span
+                v-if="message.tokens.estimated"
+                class="text-xs font-normal text-amber-600 dark:text-amber-400 px-1.5 py-0.5 bg-amber-50 dark:bg-amber-900/30 rounded"
+                title="Input and Cache are estimated from conversation size (output is exact). Input ≈ conversation context; Cache ≈ system prompt + tool definitions overhead."
+              >
+                ~estimated
+              </span>
+              <!-- Cost badge -->
+              <span
+                v-if="message.tokens.cost != null && message.tokens.cost > 0"
+                class="ml-auto text-sm font-semibold text-green-700 dark:text-green-400"
+                :title="message.tokens.estimated ? 'Estimated cost (input/cache estimated)' : 'Cost based on exact token counts'"
+              >
+                <span v-if="message.tokens.estimated" class="text-xs font-normal opacity-70">~</span>{{ formatCost(message.tokens.cost) }}
+              </span>
             </div>
             <div class="grid grid-cols-4 gap-4">
               <div class="bg-primary rounded-lg p-3 text-center">
-                <p class="text-xs text-muted">Input</p>
+                <p class="text-xs text-muted">
+                  <span v-if="message.tokens.estimated" class="text-amber-500">~</span>Input
+                </p>
                 <p class="text-lg font-bold text-primary">{{ formatNumber(message.tokens.input) }}</p>
               </div>
               <div class="bg-primary rounded-lg p-3 text-center">
@@ -127,13 +144,15 @@ onUnmounted(() => {
                 <p class="text-lg font-bold text-primary">{{ formatNumber(message.tokens.output) }}</p>
               </div>
               <div class="bg-primary rounded-lg p-3 text-center">
-                <p class="text-xs text-muted">Cache Read</p>
+                <p class="text-xs text-muted">
+                  <span v-if="message.tokens.estimated" class="text-amber-500">~</span>Cache Read
+                </p>
                 <p class="text-lg font-bold text-primary">{{ formatNumber(message.tokens.cacheRead || 0) }}</p>
               </div>
               <div class="bg-primary rounded-lg p-3 text-center">
                 <p class="text-xs text-muted">Total</p>
                 <p class="text-lg font-bold text-primary">
-                  {{ formatNumber(message.tokens.input + message.tokens.output) }}
+                  <span v-if="message.tokens.estimated" class="text-xs text-amber-500 mr-0.5">~</span>{{ formatNumber(message.tokens.input + message.tokens.output) }}
                 </p>
               </div>
             </div>

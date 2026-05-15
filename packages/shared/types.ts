@@ -142,6 +142,21 @@ export interface CopilotEvent {
     messageId?: string;
     toolRequests?: ToolRequest[];
     reasoningText?: string;
+    outputTokens?: number;
+    requestId?: string;
+    interactionId?: string;
+    turnId?: string;
+
+    // session.start
+    selectedModel?: string;
+
+    // session.compaction_start
+    systemTokens?: number;
+    conversationTokens?: number;
+    toolDefinitionsTokens?: number;
+
+    // system.message
+    role?: string;
 
     // tool.execution_*
     toolCallId?: string;
@@ -206,6 +221,10 @@ export interface Message {
     output: number;
     cacheRead?: number;
     cacheCreation?: number;
+    /** true when input tokens were estimated rather than recorded exactly */
+    estimated?: boolean;
+    /** Total USD cost for this API call (0 if model pricing is unknown) */
+    cost?: number;
   };
 
   toolCalls?: ToolCall[];
@@ -240,6 +259,8 @@ export interface SessionStats {
     totalOutput: number;
     totalCacheRead: number;
     totalCacheCreation: number;
+    /** Total USD cost for the session (0 if model pricing is unknown) */
+    totalCost?: number;
     inputPerMessage: number[];
     outputPerMessage: number[];
     cumulativeTokens: number[];

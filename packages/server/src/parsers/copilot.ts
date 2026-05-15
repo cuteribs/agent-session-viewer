@@ -10,6 +10,16 @@ import type {
   SessionStats,
   ToolUsageSummary,
 } from '../types/index.js';
+import { calculateCost } from '../pricing.js';
+
+// Calibrated chars-per-token ratio for Copilot sessions.
+// Code/JSON-heavy content tokenises at ~3 chars/token (calibrated against
+// session.compaction_start.conversationTokens ground-truth data).
+const CHARS_PER_TOKEN = 3;
+
+// Default token overheads used when compaction_start events are absent
+const DEFAULT_SYSTEM_TOKENS = 9278;
+const DEFAULT_TOOL_DEFS_TOKENS = 7325;
 
 export function parseCopilotSessionFile(filePath: string): SessionDetail | null {
   try {
@@ -40,14 +50,31 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
     const projectPath = startEvent?.data.context?.cwd || dirname(filePath);
     const project = basename(projectPath);
 
-    // Parse messages and tool events
-    const messages: Message[] = [];
+    // Derive initial model from session.start.selectedModel
+    let model: string | undefined = startEvent?.data.selectedModel;
+
+    // ---------------------------------------------------------------
+    // Collect fixed overhead from the first session.compaction_start
+    // (systemTokens + toolDefinitionsTokens).  These are constant
+    // across all API calls in a session.
+    // ---------------------------------------------------------------
+    let systemOverheadTokens = DEFAULT_SYSTEM_TOKENS;
+    let toolDefsOverhead = DEFAULT_TOOL_DEFS_TOKENS;
+    let toolDefsSet = false;
+
+    // ---------------------------------------------------------------
+    // First pass: collect fixed overheads, tool results, model changes
+    // ---------------------------------------------------------------
     const toolUsageMap = new Map<string, { count: number; successes: number }>();
     const toolResultsById = new Map<string, ToolResult>();
-    let model: string | undefined;
 
-    // First pass: collect tool results
     for (const event of events) {
+      if (event.type === 'session.compaction_start' && event.data.systemTokens && !toolDefsSet) {
+        // Use the server-reported values if available (most accurate)
+        systemOverheadTokens = event.data.systemTokens;
+        toolDefsOverhead = event.data.toolDefinitionsTokens ?? DEFAULT_TOOL_DEFS_TOKENS;
+        toolDefsSet = true;
+      }
       if (event.type === 'tool.execution_complete' && event.data.toolCallId) {
         toolResultsById.set(event.data.toolCallId, {
           toolCallId: event.data.toolCallId,
@@ -55,7 +82,6 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
           content: event.data.result?.content || '',
         });
 
-        // Track tool usage
         const toolName = event.data.toolName || 'unknown';
         const existing = toolUsageMap.get(toolName) || { count: 0, successes: 0 };
         existing.count++;
@@ -70,16 +96,58 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
       }
     }
 
-    // Second pass: build messages
+    // ---------------------------------------------------------------
+    // Second pass: build messages + estimate token usage
+    // ---------------------------------------------------------------
+    const messages: Message[] = [];
+
+    // Token arrays for charts (one entry per assistant API call)
+    const inputPerMessage: number[] = [];
+    const outputPerMessage: number[] = [];
+    const cumulativeTokens: number[] = [];
+    let totalInput = 0;
+    let totalOutput = 0;
+    let totalCost = 0;
+
+    // Running estimate of conversation context in characters.
+    // Resets when a session.compaction_complete event is detected.
+    let conversationChars = 0;
+    // Current system prompt char count (overwritten by each system.message event)
+    let activeSystemChars = 0;
+    // The input token count from the previous assistant turn — used to estimate
+    // cache hits.  Claude caches the full prefix, so previous turn's context ≈
+    // what is served from cache in the current turn.
+    let prevInputTokens = 0;
+    let totalCacheRead = 0;
+
     for (const event of events) {
+      // Track system prompt changes
+      if (event.type === 'system.message' && event.data.content) {
+        activeSystemChars = event.data.content.length;
+        continue;
+      }
+
+      // After successful compaction the conversation history is reset;
+      // start the context accumulator fresh.
+      if (event.type === 'session.compaction_complete' && event.data.success) {
+        conversationChars = (event.data.summaryContent as string | undefined ?? '').length;
+        // After compaction the new context is a clean summary, so the
+        // previous cache entry no longer applies.
+        prevInputTokens = 0;
+        continue;
+      }
+
       if (event.type === 'user.message') {
+        const userContent = event.data.content || event.data.transformedContent || '';
         messages.push({
           id: event.id,
           parentId: event.parentId,
           role: 'user',
-          content: event.data.content || event.data.transformedContent || '',
+          content: userContent,
           timestamp: event.timestamp,
         });
+        conversationChars += userContent.length;
+
       } else if (event.type === 'assistant.message') {
         const toolCalls: ToolCall[] = (event.data.toolRequests || []).map(tr => ({
           id: tr.toolCallId,
@@ -87,20 +155,62 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
           arguments: tr.arguments,
         }));
 
-        let content = '';
-        if (event.data.reasoningText) {
-          content = event.data.reasoningText;
+        const msgContent = event.data.reasoningText || '';
+
+        // ---------- Token estimation ----------
+        // Model: Copilot caches the system prompt + tool definitions on every call
+        // after the first.  The "new" (non-cached) input is therefore just the
+        // growing conversation context.
+        const sysTokens = activeSystemChars > 0
+          ? Math.round(activeSystemChars / CHARS_PER_TOKEN)
+          : systemOverheadTokens;
+
+        // New (non-cached) input = conversation accumulated so far
+        const estInputTokens = Math.round(conversationChars / CHARS_PER_TOKEN);
+
+        // Cache = system + tool-definitions overhead (fixed per-call, always cached
+        // after the first round-trip; treat first call as 0 for accuracy).
+        const estCacheRead = prevInputTokens === 0 ? 0 : (sysTokens + toolDefsOverhead);
+
+        const exactOutputTokens = event.data.outputTokens ?? 0;
+        const msgCost = calculateCost(
+          { input: estInputTokens, output: exactOutputTokens, cacheRead: estCacheRead },
+          model
+        );
+
+        inputPerMessage.push(estInputTokens);
+        outputPerMessage.push(exactOutputTokens);
+        totalInput += estInputTokens;
+        totalOutput += exactOutputTokens;
+        totalCacheRead += estCacheRead;
+        totalCost += msgCost;
+        cumulativeTokens.push(totalInput + totalOutput);
+
+        // After this API call the assistant response is added to context
+        conversationChars += msgContent.length;
+        if (event.data.toolRequests && event.data.toolRequests.length > 0) {
+          conversationChars += JSON.stringify(event.data.toolRequests).length;
         }
+        // Mark that at least one turn has been seen (so subsequent turns use cache estimate)
+        prevInputTokens = estInputTokens + estCacheRead; // full context for next-turn reference
 
         messages.push({
           id: event.id,
           parentId: event.parentId,
           role: 'assistant',
-          content,
+          content: msgContent,
           timestamp: event.timestamp,
           model,
           toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+          tokens: {
+            input: estInputTokens,
+            output: exactOutputTokens,
+            cacheRead: estCacheRead,
+            estimated: true,
+            cost: msgCost,
+          },
         });
+
       } else if (event.type === 'tool.execution_complete') {
         const result = toolResultsById.get(event.data.toolCallId || '');
         if (result) {
@@ -112,6 +222,8 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
             timestamp: event.timestamp,
             toolResult: result,
           });
+          // Tool results are sent back to the model in the next request
+          conversationChars += result.content.length;
         }
       } else if (event.type === 'session.error') {
         messages.push({
@@ -124,7 +236,9 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
       }
     }
 
+    // ---------------------------------------------------------------
     // Build tool usage summary
+    // ---------------------------------------------------------------
     const toolUsage: ToolUsageSummary[] = Array.from(toolUsageMap.entries()).map(
       ([name, { count, successes }]) => ({
         name,
@@ -133,11 +247,9 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
       })
     );
 
-    // Calculate stats
     const userMessages = messages.filter(m => m.role === 'user').length;
     const assistantMessages = messages.filter(m => m.role === 'assistant').length;
 
-    // Calculate duration from timestamps
     let duration = 0;
     if (messages.length >= 2) {
       const start = new Date(messages[0].timestamp).getTime();
@@ -145,10 +257,26 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
       duration = end - start;
     }
 
+    const tokenStats = assistantMessages > 0
+      ? {
+          totalInput,
+          totalOutput,
+          totalCacheRead,
+          totalCacheCreation: 0,
+          totalCost,
+          inputPerMessage,
+          outputPerMessage,
+          cumulativeTokens,
+        }
+      : undefined;
+
+    const totalTokens = assistantMessages > 0 ? totalInput + totalOutput : undefined;
+
     const stats: SessionStats = {
       messageCount: messages.length,
       userMessages,
       assistantMessages,
+      tokens: tokenStats,
       tools: toolUsage.map(t => ({
         name: t.name,
         count: t.count,
@@ -168,6 +296,7 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
       startTime,
       lastActivity,
       messageCount: messages.length,
+      totalTokens,
       model,
       messages,
       stats,
@@ -188,6 +317,8 @@ export function getCopilotSessionSummary(detail: SessionDetail): SessionSummary 
     startTime: detail.startTime,
     lastActivity: detail.lastActivity,
     messageCount: detail.messageCount,
+    totalTokens: detail.totalTokens,
     model: detail.model,
   };
 }
+

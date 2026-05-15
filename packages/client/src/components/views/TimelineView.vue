@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useSessionsStore } from '@/stores/sessions'
-import { formatTime, truncateText, getRoleColor, formatTokens } from '@/utils/formatters'
+import { formatTime, truncateText, getRoleColor, formatTokens, formatCost } from '@/utils/formatters'
 import type { SessionDetail, Message, ToolCall } from '@/types'
 import { watch, nextTick, computed } from 'vue'
 
@@ -90,9 +90,18 @@ function summarizeArgs(args: Record<string, unknown>): string {
           <span
             v-if="message.tokens"
             class="text-xs px-2 py-0.5 bg-secondary rounded"
-            :title="`Input: ${message.tokens.input}, Output: ${message.tokens.output}`"
+            :title="message.tokens.estimated
+              ? `~Input: ${message.tokens.input.toLocaleString()} (est. conv context), Output: ${message.tokens.output.toLocaleString()} (exact), ~Cache: ${(message.tokens.cacheRead ?? 0).toLocaleString()} (est. sys overhead)`
+              : `Input: ${message.tokens.input.toLocaleString()}, Output: ${message.tokens.output.toLocaleString()}`"
           >
-            {{ formatTokens(message.tokens.input + message.tokens.output) }} tokens
+            <span v-if="message.tokens.estimated" class="text-amber-500">~</span>{{ formatTokens(message.tokens.input + message.tokens.output) }} tokens
+          </span>
+          <span
+            v-if="message.tokens?.cost != null && message.tokens.cost > 0"
+            class="text-xs px-2 py-0.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded"
+            :title="message.tokens.estimated ? 'Estimated cost (input/cache estimated)' : 'Cost based on exact token counts'"
+          >
+            <span v-if="message.tokens.estimated" class="opacity-70">~</span>{{ formatCost(message.tokens.cost) }}
           </span>
           <span class="text-xs text-muted">
             {{ formatTime(message.timestamp) }}

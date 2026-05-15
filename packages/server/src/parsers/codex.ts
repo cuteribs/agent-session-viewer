@@ -15,6 +15,7 @@ import type {
   SessionStats,
   ToolUsageSummary,
 } from '../types/index.js';
+import { calculateCost } from '../pricing.js';
 
 export function parseCodexSessionFile(filePath: string): SessionDetail | null {
   try {
@@ -191,10 +192,15 @@ export function parseCodexSessionFile(filePath: string): SessionDetail | null {
         for (let j = i + 1; j < Math.min(events.length, i + 10); j++) {
           const tc = tokenCountsByIndex.get(j);
           if (tc) {
+            const msgCost = calculateCost(
+              { input: tc.input_tokens, output: tc.output_tokens, cacheRead: tc.cached_input_tokens },
+              model
+            );
             tokens = {
               input: tc.input_tokens,
               output: tc.output_tokens,
               cacheRead: tc.cached_input_tokens,
+              cost: msgCost,
             };
             inputPerMessage.push(tc.input_tokens);
             outputPerMessage.push(tc.output_tokens);
@@ -237,6 +243,10 @@ export function parseCodexSessionFile(filePath: string): SessionDetail | null {
           totalOutput: finalTotalUsage.output_tokens,
           totalCacheRead: finalTotalUsage.cached_input_tokens,
           totalCacheCreation: 0,
+          totalCost: calculateCost(
+            { input: finalTotalUsage.input_tokens, output: finalTotalUsage.output_tokens, cacheRead: finalTotalUsage.cached_input_tokens },
+            model
+          ),
           inputPerMessage,
           outputPerMessage,
           cumulativeTokens,
