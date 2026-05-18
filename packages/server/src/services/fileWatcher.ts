@@ -144,6 +144,10 @@ function extractSessionId(filePath: string, source: SessionSource): string | nul
   }
 }
 
+export function isWatcherRunning(): boolean {
+  return watcher !== null;
+}
+
 export function stopFileWatcher(): void {
   if (watcher) {
     watcher.close();

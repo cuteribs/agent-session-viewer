@@ -2,6 +2,7 @@
 export type {
   SessionSummary,
   SessionDetail,
+  SubAgent,
   Message,
   ToolCall,
   ToolResult,

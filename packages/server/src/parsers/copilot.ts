@@ -4,6 +4,7 @@ import type {
   CopilotEvent,
   SessionSummary,
   SessionDetail,
+  SubAgent,
   Message,
   ToolCall,
   ToolResult,
@@ -67,6 +68,8 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
     // ---------------------------------------------------------------
     const toolUsageMap = new Map<string, { count: number; successes: number }>();
     const toolResultsById = new Map<string, ToolResult>();
+    const subAgentMap = new Map<string, SubAgent>();
+    const subAgentByName = new Map<string, SubAgent>();
 
     for (const event of events) {
       if (event.type === 'session.compaction_start' && event.data.systemTokens && !toolDefsSet) {
@@ -89,6 +92,70 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
           existing.successes++;
         }
         toolUsageMap.set(toolName, existing);
+      }
+
+      if (event.type === 'tool.execution_start' && event.data.toolName === 'task') {
+        const toolCallId = event.data.toolCallId || '';
+        const args = event.data.arguments || {};
+        const agentId = String(args.name || toolCallId.substring(0, 8));
+        const agent: SubAgent = {
+          id: toolCallId,
+          agentId,
+          agentType: String(args.agent_type || 'task'),
+          agentDisplayName: String(args.agent_type || 'Agent'),
+          description: args.description ? String(args.description) : undefined,
+          prompt: args.prompt ? String(args.prompt) : undefined,
+          status: 'started',
+          startTime: event.timestamp,
+        };
+        subAgentMap.set(toolCallId, agent);
+        subAgentByName.set(agentId, agent);
+      }
+
+      if (event.type === 'subagent.started' && event.data.toolCallId) {
+        const agent = subAgentMap.get(event.data.toolCallId);
+        if (agent) {
+          if (event.data.agentDisplayName) {
+            agent.agentDisplayName = event.data.agentDisplayName;
+          }
+          if (event.data.agentDescription) {
+            agent.description = event.data.agentDescription;
+          }
+        }
+      }
+
+      if (event.type === 'subagent.completed' && event.data.toolCallId) {
+        const agent = subAgentMap.get(event.data.toolCallId);
+        if (agent) {
+          agent.status = 'completed';
+          agent.model = event.data.model;
+          agent.totalTokens = event.data.totalTokens;
+          agent.totalToolCalls = event.data.totalToolCalls;
+          agent.durationMs = event.data.durationMs;
+          agent.endTime = event.timestamp;
+        }
+      }
+
+      if (event.type === 'tool.execution_complete' && event.data.toolTelemetry?.properties?.agent_id) {
+        const agentId = event.data.toolTelemetry.properties.agent_id;
+        const status = event.data.toolTelemetry.properties.status;
+        const agent = subAgentByName.get(agentId);
+        if (agent) {
+          if (status === 'completed') {
+            agent.status = 'completed';
+          } else if (status === 'failed' || event.data.success === false) {
+            agent.status = 'failed';
+          }
+
+          if ((status === 'completed' || status === 'failed' || event.data.success === false) && !agent.endTime) {
+            agent.endTime = event.timestamp;
+          }
+
+          const resultContent = event.data.result?.detailedContent || event.data.result?.content;
+          if (resultContent && !agent.result) {
+            agent.result = resultContent;
+          }
+        }
       }
 
       if (event.type === 'session.model_change' && event.data.newModel) {
@@ -301,6 +368,7 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
       messages,
       stats,
       toolUsage,
+      subAgents: subAgentMap.size > 0 ? Array.from(subAgentMap.values()) : undefined,
     };
   } catch (error) {
     console.error(`Error parsing Copilot session file ${filePath}:`, error);
@@ -319,6 +387,7 @@ export function getCopilotSessionSummary(detail: SessionDetail): SessionSummary 
     messageCount: detail.messageCount,
     totalTokens: detail.totalTokens,
     model: detail.model,
+    subAgentCount: detail.subAgents?.length,
   };
 }
 

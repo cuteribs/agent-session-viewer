@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useSessionsStore } from '@/stores/sessions'
 import { formatRelativeTime, formatTokens, truncateText } from '@/utils/formatters'
 import type { SessionSummary } from '@/types'
@@ -10,6 +10,7 @@ const props = defineProps<{
 
 const sessionsStore = useSessionsStore()
 const showDeleteConfirm = ref(false)
+const showSubAgents = ref(false)
 
 const isActive = computed(() => {
   return (
@@ -18,7 +19,19 @@ const isActive = computed(() => {
   )
 })
 
+const subAgents = computed(() => {
+  if (!isActive.value) return []
+  return sessionsStore.currentSession?.subAgents ?? []
+})
+
+watch(isActive, active => {
+  if (!active) {
+    showSubAgents.value = false
+  }
+})
+
 function handleClick() {
+  sessionsStore.clearSubAgent()
   sessionsStore.selectSession(props.session.source, props.session.id)
 }
 
@@ -68,8 +81,15 @@ function cancelDelete() {
           <p class="text-xs text-muted">
             {{ formatRelativeTime(session.lastActivity) }}
           </p>
-          <div class="flex items-center gap-2 mt-1">
+          <div class="flex items-center gap-2 mt-1 flex-wrap justify-end">
             <span class="text-xs text-secondary">{{ session.messageCount }} msgs</span>
+            <span
+              v-if="!isActive && session.subAgentCount"
+              class="text-xs px-1 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded"
+              title="Has subagents"
+            >
+              {{ session.subAgentCount }} agents
+            </span>
             <span
               v-if="session.totalTokens"
               class="text-xs px-1.5 py-0.5 bg-tertiary rounded"
@@ -80,7 +100,6 @@ function cancelDelete() {
         </div>
       </div>
 
-      <!-- Delete button (hidden until hover) -->
       <button
         @click.stop="handleDelete"
         class="absolute top-2 right-2 p-1 opacity-0 group-hover:opacity-100 hover:bg-red-500/20 rounded transition-all"
@@ -92,7 +111,36 @@ function cancelDelete() {
       </button>
     </button>
 
-    <!-- Delete confirmation modal -->
+    <button
+      v-if="isActive && subAgents.length"
+      @click.stop="showSubAgents = !showSubAgents"
+      class="w-full flex items-center gap-2 px-4 py-1.5 text-xs text-secondary hover:bg-tertiary border-t border-default"
+    >
+      <svg class="w-3 h-3 transition-transform" :class="showSubAgents ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+      </svg>
+      {{ subAgents.length }} Subagent{{ subAgents.length > 1 ? 's' : '' }}
+    </button>
+
+    <div v-if="isActive && showSubAgents" class="border-t border-default">
+      <button
+        v-for="agent in subAgents"
+        :key="agent.id"
+        @click.stop="sessionsStore.selectSubAgent(agent)"
+        class="w-full text-left flex items-center gap-2 px-5 py-2 text-xs hover:bg-tertiary transition-colors"
+        :class="sessionsStore.selectedSubAgent?.id === agent.id ? 'bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-500' : ''"
+      >
+        <span class="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
+        <div class="flex-1 min-w-0">
+          <span class="font-medium text-primary">{{ agent.agentId }}</span>
+          <span class="text-muted ml-1">({{ agent.agentType }})</span>
+        </div>
+        <span :class="agent.status === 'completed' ? 'text-green-500' : agent.status === 'failed' ? 'text-red-500' : 'text-amber-500'" class="text-xs">
+          {{ agent.status }}
+        </span>
+      </button>
+    </div>
+
     <Teleport to="body">
       <Transition name="fade">
         <div

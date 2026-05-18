@@ -40,7 +40,7 @@ export function getServerConfig(): ServerConfig {
   return {
     port: parseInt(process.env.PORT || '3000', 10),
     host: process.env.HOST || 'localhost',
-    watchEnabled: process.env.WATCH_ENABLED !== 'false',
+    watchEnabled: process.env.WATCH_ENABLED === 'true',
     watchDebounceMs: parseInt(process.env.WATCH_DEBOUNCE_MS || '500', 10),
     paths: {
       claude: parsePathList(process.env.CLAUDE_PATHS, getDefaultClaudePath()),

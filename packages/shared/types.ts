@@ -80,7 +80,7 @@ export interface CodexTurnContext {
 }
 
 export interface ClaudeCodeEntry {
-  type: 'user' | 'assistant' | 'system' | 'file-history-snapshot';
+  type: 'user' | 'assistant' | 'system' | 'file-history-snapshot' | 'attachment';
   uuid: string;
   parentUuid: string | null;
   sessionId: string;
@@ -88,6 +88,12 @@ export interface ClaudeCodeEntry {
   cwd: string;
   version: string;
   gitBranch?: string;
+  /** true for entries belonging to a subagent sidechain (stored in separate files) */
+  isSidechain?: boolean;
+  /** ID of the subagent that produced this entry */
+  agentId?: string;
+  /** Agent type attribution (e.g. "general-purpose", "explore") */
+  attributionAgent?: string;
 
   message?: {
     role: 'user' | 'assistant';
@@ -154,6 +160,7 @@ export interface CopilotEvent {
     systemTokens?: number;
     conversationTokens?: number;
     toolDefinitionsTokens?: number;
+    summaryContent?: string;
 
     // system.message
     role?: string;
@@ -166,6 +173,21 @@ export interface CopilotEvent {
     result?: {
       content: string;
       detailedContent?: string;
+    };
+
+    // subagent.* events
+    agentName?: string;
+    agentDisplayName?: string;
+    agentDescription?: string;
+    model?: string;
+    totalTokens?: number;
+    totalToolCalls?: number;
+    durationMs?: number;
+    // tool.execution_complete (for read_agent results)
+    toolTelemetry?: {
+      properties?: Record<string, string>;
+      restrictedProperties?: Record<string, string>;
+      metrics?: Record<string, number>;
     };
 
     // session.model_change
@@ -190,6 +212,23 @@ export interface ToolRequest {
 // Application Data Models
 // ============================================
 
+export interface SubAgent {
+  id: string;
+  agentId: string;
+  agentType: string;
+  agentDisplayName: string;
+  description?: string;
+  prompt?: string;
+  status: 'started' | 'completed' | 'failed';
+  result?: string;
+  model?: string;
+  totalTokens?: number;
+  totalToolCalls?: number;
+  durationMs?: number;
+  startTime: string;
+  endTime?: string;
+}
+
 export interface SessionSummary {
   id: string;
   source: 'claude' | 'copilot' | 'codex';
@@ -200,12 +239,14 @@ export interface SessionSummary {
   messageCount: number;
   totalTokens?: number;
   model?: string;
+  subAgentCount?: number;
 }
 
 export interface SessionDetail extends SessionSummary {
   messages: Message[];
   stats: SessionStats;
   toolUsage: ToolUsageSummary[];
+  subAgents?: SubAgent[];
 }
 
 export interface Message {
@@ -297,11 +338,12 @@ export interface AppConfig {
 // ============================================
 
 export interface WSMessage {
-  type: 'session_updated' | 'session_created' | 'session_deleted';
+  type: 'session_updated' | 'session_created' | 'session_deleted' | 'watch_status';
   payload: {
-    source: 'claude' | 'copilot' | 'codex';
-    sessionId: string;
+    source?: 'claude' | 'copilot' | 'codex';
+    sessionId?: string;
     data?: SessionSummary;
+    active?: boolean;
   };
 }
 

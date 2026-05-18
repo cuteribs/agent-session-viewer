@@ -45,8 +45,20 @@ function stopResize() {
         :class="[
           'flex-1 py-2 px-3 text-sm font-medium transition-colors capitalize',
           sessionsStore.sourceFilter === filter
-            ? 'text-accent border-b-2 border-accent'
-            : 'text-secondary hover:text-primary'
+            ? [
+                'border-b-2 text-white',
+                filter === 'all'     ? 'bg-gray-500     border-gray-500'     : '',
+                filter === 'claude'  ? 'bg-orange-500   border-orange-500'   : '',
+                filter === 'copilot' ? 'bg-purple-500   border-purple-500'   : '',
+                filter === 'codex'   ? 'bg-blue-500     border-blue-500'     : '',
+              ]
+            : [
+                'text-secondary hover:text-primary',
+                filter === 'claude'  ? 'hover:bg-orange-50  dark:hover:bg-orange-900/10'  : '',
+                filter === 'copilot' ? 'hover:bg-purple-50  dark:hover:bg-purple-900/10' : '',
+                filter === 'codex'   ? 'hover:bg-blue-50    dark:hover:bg-blue-900/10'   : '',
+                filter === 'all'     ? 'hover:bg-gray-100   dark:hover:bg-gray-700/30'   : '',
+              ]
         ]"
       >
         {{ filter }}

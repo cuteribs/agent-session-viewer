@@ -115,17 +115,72 @@ pre {
 }
 
 /* Message content */
-.message-content {
+.message-content,
+.markdown-content {
   line-height: 1.6;
 }
 
-.message-content p {
+.message-content p,
+.markdown-content p {
   margin-bottom: 0.5rem;
 }
 
-.message-content ul, .message-content ol {
+.message-content ul,
+.message-content ol,
+.markdown-content ul,
+.markdown-content ol {
   margin-left: 1.5rem;
   margin-bottom: 0.5rem;
+}
+
+.markdown-content ul {
+  list-style: disc;
+}
+
+.markdown-content ol {
+  list-style: decimal;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+}
+
+.markdown-content h1 {
+  font-size: 1.125rem;
+}
+
+.markdown-content h2 {
+  font-size: 1rem;
+}
+
+.markdown-content h3 {
+  font-size: 0.875rem;
+}
+
+.markdown-content a {
+  color: var(--accent-color);
+  text-decoration: underline;
+}
+
+.markdown-content blockquote {
+  border-left: 3px solid var(--border-color);
+  color: var(--text-secondary);
+  margin: 0 0 0.75rem;
+  padding-left: 0.75rem;
+}
+
+.markdown-content pre {
+  margin: 0 0 0.75rem;
+}
+
+.markdown-content :not(pre) > code {
+  background-color: var(--bg-secondary);
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.25rem;
 }
 
 /* Transitions */

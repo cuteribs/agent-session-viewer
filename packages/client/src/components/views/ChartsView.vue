@@ -235,7 +235,10 @@ function formatTime(timestamp: string): string {
           <span v-if="session.source === 'copilot'" class="text-amber-500">~</span>Cache Read
         </p>
         <p class="text-2xl font-bold text-primary">{{ session.stats.tokens.totalCacheRead.toLocaleString() }}</p>
-        <p v-if="session.source === 'copilot'" class="text-xs text-muted mt-1">sys + tool overhead</p>
+        <p class="text-xs text-muted mt-1">
+          <template v-if="session.source === 'copilot'">sys + tool overhead</template>
+          <template v-else>peak cached context</template>
+        </p>
       </div>
       <div class="bg-primary rounded-lg p-4 border border-default">
         <p class="text-sm text-muted">Cache Creation</p>

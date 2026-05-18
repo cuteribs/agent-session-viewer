@@ -43,6 +43,11 @@ function groupToolCalls(toolCalls: ToolCall[]): { name: string; calls: ToolCall[
 
 /** Return a compact one-line summary of tool arguments. */
 function summarizeArgs(args: Record<string, unknown>): string {
+  // Guard: in some sessions arguments may be a raw string (e.g. patch content)
+  if (typeof args !== 'object' || args === null) {
+    const str = String(args)
+    return str.length > 120 ? str.substring(0, 120) + '…' : str
+  }
   const PRIORITY_KEYS = ['command', 'cmd', 'input', 'path', 'file_path', 'filepath', 'query', 'url', 'content']
   for (const key of PRIORITY_KEYS) {
     if (key in args && args[key] !== undefined && args[key] !== null) {

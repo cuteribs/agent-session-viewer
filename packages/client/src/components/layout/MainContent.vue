@@ -7,6 +7,7 @@ import TimelineView from '@/components/views/TimelineView.vue'
 import ChartsView from '@/components/views/ChartsView.vue'
 import TreeView from '@/components/views/TreeView.vue'
 import RawView from '@/components/views/RawView.vue'
+import SubAgentView from '@/components/views/SubAgentView.vue'
 import TokenBadge from '@/components/common/TokenBadge.vue'
 
 const sessionsStore = useSessionsStore()
@@ -19,6 +20,7 @@ const tabs = [
 ] as const
 
 const session = computed(() => sessionsStore.currentSession)
+const selectedSubAgent = computed(() => sessionsStore.selectedSubAgent)
 
 function handleExport(format: 'csv' | 'json') {
   if (!session.value) return
@@ -45,6 +47,17 @@ function handleExport(format: 'csv' | 'json') {
 
     <!-- Session content -->
     <template v-else>
+      <!-- SubAgent view (replaces session tabs when a subagent is selected) -->
+      <SubAgentView
+        v-if="selectedSubAgent"
+        :agent="selectedSubAgent"
+        :parent-name="session.project"
+        @back="sessionsStore.clearSubAgent()"
+        class="flex-1 overflow-hidden"
+      />
+
+      <!-- Normal session view -->
+      <template v-else>
       <!-- Session header -->
       <div class="bg-primary border-b border-default px-4 py-3">
         <div class="flex items-start justify-between">
@@ -151,6 +164,7 @@ function handleExport(format: 'csv' | 'json') {
         <TreeView v-else-if="sessionsStore.activeView === 'tree'" :session="session" />
         <RawView v-else-if="sessionsStore.activeView === 'raw'" :session="session" />
       </div>
+      </template><!-- end v-else (no subagent selected) -->
     </template>
   </main>
 </template>

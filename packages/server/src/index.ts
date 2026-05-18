@@ -6,6 +6,7 @@ import { getServerConfig } from './config.js';
 import { sessionsRouter } from './routes/sessions.js';
 import { configRouter } from './routes/config.js';
 import { exportRouter } from './routes/export.js';
+import { createWatchRouter } from './routes/watch.js';
 import { initFileWatcher } from './services/fileWatcher.js';
 import type { WSMessage } from './types/index.js';
 
@@ -58,6 +59,7 @@ app.use(express.json());
 app.use('/api/sessions', sessionsRouter);
 app.use('/api/config', configRouter);
 app.use('/api/export', exportRouter);
+app.use('/api/watch', createWatchRouter(broadcast));
 
 // Health check
 app.get('/api/health', (_req, res) => {

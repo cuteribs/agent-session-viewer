@@ -1,14 +1,16 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { fetchSessions, fetchSession, deleteSession } from '../utils/api'
+import { fetchSessions, fetchSession, deleteSession, fetchWatchStatus, setWatchStatus } from '../utils/api'
 import { useWebSocket } from '../composables/useWebSocket'
-import type { SessionSummary, SessionDetail, Message, ViewMode } from '../types'
+import type { SessionSummary, SessionDetail, Message, ViewMode, SubAgent } from '../types'
 
 export const useSessionsStore = defineStore('sessions', () => {
   // State
   const sessions = ref<SessionSummary[]>([])
   const currentSession = ref<SessionDetail | null>(null)
   const loading = ref(false)
+  /** Separate loading flag for fetching session detail — does not hide the sidebar list */
+  const detailLoading = ref(false)
   const error = ref<string | null>(null)
   const sourceFilter = ref<'all' | 'claude' | 'copilot' | 'codex'>('all')
   const searchQuery = ref('')
@@ -16,6 +18,9 @@ export const useSessionsStore = defineStore('sessions', () => {
   const previewMessage = ref<Message | null>(null)
   const showSettings = ref(false)
   const selectedMessageIndex = ref<number | null>(null)
+  const watchEnabled = ref(false)
+  const watchLoading = ref(false)
+  const selectedSubAgent = ref<SubAgent | null>(null)
 
   // WebSocket setup
   const { connect, onMessage } = useWebSocket()
@@ -83,14 +88,14 @@ export const useSessionsStore = defineStore('sessions', () => {
   }
 
   async function selectSession(source: 'claude' | 'copilot' | 'codex', sessionId: string) {
-    loading.value = true
+    detailLoading.value = true
     error.value = null
     try {
       currentSession.value = await fetchSession(source, sessionId)
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to load session'
     } finally {
-      loading.value = false
+      detailLoading.value = false
     }
   }
 
@@ -153,6 +158,36 @@ export const useSessionsStore = defineStore('sessions', () => {
     setActiveView('timeline')
   }
 
+  function selectSubAgent(agent: SubAgent) {
+    selectedSubAgent.value = agent
+  }
+
+  function clearSubAgent() {
+    selectedSubAgent.value = null
+  }
+
+  async function initWatchStatus() {
+    try {
+      const status = await fetchWatchStatus()
+      watchEnabled.value = status.active
+    } catch {
+      // non-critical — watcher status unknown
+    }
+  }
+
+  async function toggleWatch() {
+    if (watchLoading.value) return
+    watchLoading.value = true
+    try {
+      const status = await setWatchStatus(!watchEnabled.value)
+      watchEnabled.value = status.active
+    } catch (e) {
+      console.error('Failed to toggle watch:', e)
+    } finally {
+      watchLoading.value = false
+    }
+  }
+
   // WebSocket handlers
   function initWebSocket() {
     console.log('Initializing WebSocket connection...')
@@ -163,7 +198,7 @@ export const useSessionsStore = defineStore('sessions', () => {
       switch (msg.type) {
         case 'session_created':
         case 'session_updated':
-          if (msg.payload.data) {
+          if (msg.payload.data && msg.payload.sessionId && msg.payload.source) {
             const index = sessions.value.findIndex(
               s => s.id === msg.payload.sessionId && s.source === msg.payload.source
             )
@@ -190,18 +225,27 @@ export const useSessionsStore = defineStore('sessions', () => {
           }
           break
         case 'session_deleted':
-          sessions.value = sessions.value.filter(
-            s => !(s.id === msg.payload.sessionId && s.source === msg.payload.source)
-          )
-          if (
-            currentSession.value?.id === msg.payload.sessionId &&
-            currentSession.value?.source === msg.payload.source
-          ) {
-            currentSession.value = null
+          if (msg.payload.sessionId && msg.payload.source) {
+            sessions.value = sessions.value.filter(
+              s => !(s.id === msg.payload.sessionId && s.source === msg.payload.source)
+            )
+            if (
+              currentSession.value?.id === msg.payload.sessionId &&
+              currentSession.value?.source === msg.payload.source
+            ) {
+              currentSession.value = null
+            }
+          }
+          break
+        case 'watch_status':
+          if (typeof msg.payload.active === 'boolean') {
+            watchEnabled.value = msg.payload.active
           }
           break
       }
     })
+    // Sync initial watcher state from server
+    initWatchStatus()
   }
 
   return {
@@ -209,6 +253,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     sessions,
     currentSession,
     loading,
+    detailLoading,
     error,
     sourceFilter,
     searchQuery,
@@ -216,6 +261,9 @@ export const useSessionsStore = defineStore('sessions', () => {
     previewMessage,
     showSettings,
     selectedMessageIndex,
+    watchEnabled,
+    watchLoading,
+    selectedSubAgent,
     // Computed
     filteredSessions,
     sessionsByDate,
@@ -234,5 +282,8 @@ export const useSessionsStore = defineStore('sessions', () => {
     initWebSocket,
     removeSession,
     selectMessageByIndex,
+    toggleWatch,
+    selectSubAgent,
+    clearSubAgent,
   }
 })

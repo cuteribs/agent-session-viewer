@@ -39,6 +39,24 @@ const sessionsStore = useSessionsStore()
 
     <!-- Right side actions -->
     <div class="flex items-center gap-2">
+      <!-- Realtime watch toggle -->
+      <button
+        @click="sessionsStore.toggleWatch()"
+        :disabled="sessionsStore.watchLoading"
+        :title="sessionsStore.watchEnabled ? 'Live updates ON — click to disable' : 'Live updates OFF — click to enable'"
+        class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
+        :class="sessionsStore.watchEnabled
+          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50'
+          : 'bg-tertiary text-muted hover:bg-quaternary'"
+      >
+        <!-- Pulse dot when active -->
+        <span
+          class="w-2 h-2 rounded-full flex-shrink-0"
+          :class="sessionsStore.watchEnabled ? 'bg-green-500 animate-pulse' : 'bg-gray-400 dark:bg-gray-600'"
+        />
+        <span>{{ sessionsStore.watchEnabled ? 'Live' : 'Offline' }}</span>
+      </button>
+
       <ThemeToggle />
 
       <!-- Settings button -->
