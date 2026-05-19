@@ -2,7 +2,7 @@
 
 ## Overview
 
-A web application for analyzing and visualizing context usage in Claude Code and Copilot CLI sessions. The app provides insights into token consumption, tool usage patterns, and conversation flow to help users understand and optimize their AI assistant interactions.
+A web application for analyzing and visualizing AI agent sessions from **Claude Code**, **Copilot CLI**, and **Codex**. The app provides insights into token consumption, cost estimation, tool usage patterns, subagent activity, and conversation flow to help users understand and optimize their AI assistant interactions.
 
 ## Architecture
 
@@ -10,12 +10,12 @@ A web application for analyzing and visualizing context usage in Claude Code and
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Frontend (Vue.js 3)                       │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────┐   │
-│  │ Session  │ │ Message  │ │  Charts  │ │   Summary        │   │
-│  │   List   │ │ Timeline │ │  View    │ │   Tables         │   │
+│  │ Session  │ │ Message  │ │  Charts  │ │   SubAgent       │   │
+│  │   List   │ │ Timeline │ │  View    │ │   View           │   │
 │  └──────────┘ └──────────┘ └──────────┘ └──────────────────┘   │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────┐   │
-│  │  Tree    │ │ Settings │ │  Export  │ │   Preferences    │   │
-│  │  View    │ │   Panel  │ │  Module  │ │   Manager        │   │
+│  │  Tree    │ │ Settings │ │  Export  │ │   Preview        │   │
+│  │  View    │ │  Modal   │ │  Module  │ │   Modal          │   │
 │  └──────────┘ └──────────┘ └──────────┘ └──────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
                               │ HTTP/WebSocket
@@ -25,15 +25,17 @@ A web application for analyzing and visualizing context usage in Claude Code and
 │  │   API    │ │  File    │ │  Parser  │ │    WebSocket     │   │
 │  │  Routes  │ │  Watcher │ │  Engine  │ │    Server        │   │
 │  └──────────┘ └──────────┘ └──────────┘ └──────────────────┘   │
-│  ┌──────────┐ ┌──────────┐                                      │
-│  │  Claude  │ │ Copilot  │                                      │
-│  │  Parser  │ │  Parser  │                                      │
-│  └──────────┘ └──────────┘                                      │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐                        │
+│  │  Claude  │ │ Copilot  │ │  Codex   │                        │
+│  │  Parser  │ │  Parser  │ │  Parser  │                        │
+│  └──────────┘ └──────────┘ └──────────┘                        │
 └─────────────────────────────────────────────────────────────────┘
                               │ File System
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Local File System                         │
-│  ~/.claude/projects/**/*.jsonl    ~/.copilot/session-state/     │
+│  ~/.claude/projects/**/*.jsonl                                   │
+│  ~/.copilot/session-state/**/events.jsonl                        │
+│  ~/.codex/sessions/**/*.jsonl                                    │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -45,6 +47,7 @@ A web application for analyzing and visualizing context usage in Claude Code and
 | Backend Framework | Express.js | REST API and static file serving |
 | WebSocket | ws | Real-time updates |
 | Frontend Framework | Vue.js 3 | UI framework with Composition API |
+| State Management | Pinia | Client-side state store |
 | Styling | Tailwind CSS | Utility-first CSS framework |
 | Charts | Chart.js + vue-chartjs | Data visualization |
 | Build Tool | Vite | Frontend build and dev server |
@@ -56,10 +59,14 @@ A web application for analyzing and visualizing context usage in Claude Code and
 
 **Location:** `~/.claude/projects/{encoded-project-path}/*.jsonl`
 
+**Subagents:** `~/.claude/projects/{encoded-project-path}/{session-id}/subagents/agent-*.jsonl`
+
+Each subagent JSONL is a full conversation log with the same entry schema as the parent session, tagged with `isSidechain: true` and an `agentId` field. The viewer automatically loads all subagent files alongside their parent session.
+
 **Schema:**
 ```typescript
 interface ClaudeCodeEntry {
-  type: 'user' | 'assistant' | 'system' | 'file-history-snapshot';
+  type: 'user' | 'assistant' | 'system' | 'file-history-snapshot' | 'attachment';
   uuid: string;
   parentUuid: string | null;
   sessionId: string;
@@ -67,6 +74,9 @@ interface ClaudeCodeEntry {
   cwd: string;
   version: string;
   gitBranch?: string;
+  isSidechain?: boolean;   // true for subagent sidechain entries
+  agentId?: string;        // hex ID of the subagent
+  attributionAgent?: string; // e.g. "general-purpose", "explore"
 
   message?: {
     role: 'user' | 'assistant';
@@ -80,7 +90,6 @@ interface ClaudeCodeEntry {
     };
   };
 
-  // System message specific
   subtype?: 'turn_duration' | 'local_command';
   durationMs?: number;
 }
@@ -96,6 +105,10 @@ interface ContentBlock {
 }
 ```
 
+**Token accuracy:** Exact values from the Claude API (`message.usage`).
+
+**Cache read note:** `cache_read_input_tokens` is a cumulative value per call (grows as context grows). The session-level `totalCacheRead` is stored as `Math.max()` across all turns (peak cached context), not a sum.
+
 ### Copilot CLI Sessions
 
 **Location:** `~/.copilot/session-state/{session-id}/events.jsonl`
@@ -103,41 +116,52 @@ interface ContentBlock {
 **Schema:**
 ```typescript
 interface CopilotEvent {
-  type: string; // 'session.start' | 'user.message' | 'assistant.message' | 'tool.*' | etc.
+  type: string; // 'session.start' | 'user.message' | 'assistant.message' | 'tool.*' | 'subagent.*' | etc.
   id: string;
   parentId: string | null;
   timestamp: string;
   data: {
     // session.start
     sessionId?: string;
-    version?: number;
-    producer?: string;
-    copilotVersion?: string;
-    context?: {
-      cwd: string;
-      gitRoot?: string;
-      branch?: string;
-    };
+    context?: { cwd: string; gitRoot?: string; branch?: string };
+    selectedModel?: string;
 
     // user.message
     content?: string;
     transformedContent?: string;
-    attachments?: unknown[];
 
     // assistant.message
     messageId?: string;
     toolRequests?: ToolRequest[];
     reasoningText?: string;
+    outputTokens?: number;   // exact output token count from API
+
+    // session.compaction_start (ground-truth for token estimation calibration)
+    systemTokens?: number;
+    conversationTokens?: number;
+    toolDefinitionsTokens?: number;
+    summaryContent?: string;
 
     // tool.execution_*
     toolCallId?: string;
     toolName?: string;
     arguments?: Record<string, unknown>;
     success?: boolean;
-    result?: {
-      content: string;
-      detailedContent?: string;
+    result?: { content: string; detailedContent?: string };
+    toolTelemetry?: {
+      properties?: Record<string, string>;  // includes agent_id, status, agent_type
+      restrictedProperties?: Record<string, string>;
+      metrics?: Record<string, number>;
     };
+
+    // subagent.* events
+    agentName?: string;
+    agentDisplayName?: string;
+    agentDescription?: string;
+    model?: string;
+    totalTokens?: number;
+    totalToolCalls?: number;
+    durationMs?: number;
 
     // session.model_change
     previousModel?: string;
@@ -146,17 +170,69 @@ interface CopilotEvent {
     // session.error
     errorType?: string;
     message?: string;
-    stack?: string;
   };
 }
+```
 
-interface ToolRequest {
-  toolCallId: string;
-  name: string;
-  arguments: Record<string, unknown>;
-  type: string;
+**Token accuracy:** Estimated. The parser uses a calibrated `CHARS_PER_TOKEN = 3` ratio (validated against `session.compaction_start.conversationTokens` ground-truth data). Estimates are flagged with `estimated: true` in the `Message.tokens` object and shown with a `~` prefix in the UI.
+
+**Subagents:** Extracted from `subagent.started` / `subagent.completed` / `tool.execution_complete` event triplets. Only aggregate stats are available (total tokens, tool call count, model, duration) — individual tool calls within the subagent are not captured in the parent session log.
+
+### Codex Sessions
+
+**Location:** `~/.codex/sessions/{year}/{month}/{day}/{name}.jsonl`
+
+**Schema:**
+```typescript
+interface CodexEvent {
+  timestamp: string;
+  type: 'session_meta' | 'event_msg' | 'response_item' | 'turn_context';
+  payload: CodexSessionMeta | CodexEventMsg | CodexResponseItem | CodexTurnContext;
+}
+
+interface CodexSessionMeta {
+  id: string;
+  timestamp: string;
+  cwd: string;
+  originator?: string;
+  cli_version?: string;
+  model_provider?: string;
+}
+
+interface CodexEventMsg {
+  type: 'user_message' | 'agent_message' | 'task_started' | 'task_complete' | 'token_count' | 'patch_apply_end' | 'turn_aborted';
+  message?: string;
+  phase?: 'commentary' | 'final' | 'final_answer';
+  info?: {
+    total_token_usage?: CodexTokenUsage;
+    last_token_usage?: CodexTokenUsage;
+    model_context_window?: number;
+  };
+  duration_ms?: number;
+  call_id?: string;
+  success?: boolean;
+}
+
+interface CodexTokenUsage {
+  input_tokens: number;
+  cached_input_tokens: number;
+  output_tokens: number;
+  reasoning_output_tokens?: number;
+  total_tokens: number;
+}
+
+interface CodexResponseItem {
+  type: 'function_call' | 'function_call_output' | 'custom_tool_call' | 'custom_tool_call_output' | 'message' | 'reasoning';
+  name?: string;
+  arguments?: string;
+  call_id?: string;
+  output?: string | unknown;
+  role?: string;
+  content?: Array<{ type: string; text?: string }>;
 }
 ```
+
+**Token accuracy:** Exact values from `token_count` events (cumulative session totals).
 
 ## API Endpoints
 
@@ -164,7 +240,7 @@ interface ToolRequest {
 
 ```
 GET /api/sessions
-  Query: ?source=claude|copilot|all
+  Query: ?source=claude|copilot|codex|all
   Response: SessionSummary[]
 
 GET /api/sessions/:source/:sessionId
@@ -176,6 +252,9 @@ GET /api/sessions/:source/:sessionId/messages
 
 GET /api/sessions/:source/:sessionId/stats
   Response: SessionStats
+
+DELETE /api/sessions/:source/:sessionId
+  Response: { success: true }
 ```
 
 ### Configuration API
@@ -189,35 +268,67 @@ PUT /api/config
   Response: AppConfig
 
 GET /api/config/paths
-  Response: { claude: string[], copilot: string[] }
-
-POST /api/config/paths/scan
-  Response: { claude: string[], copilot: string[] }
+  Response: { claude: string[], copilot: string[], codex: string[] }
 ```
+
+### Watch (Live Update) API
+
+```
+GET /api/watch
+  Response: { active: boolean }
+
+POST /api/watch
+  Body: { active: boolean }
+  Response: { active: boolean }
+```
+
+The watch state is also synced to all connected WebSocket clients via `watch_status` messages when toggled.
 
 ### Export API
 
 ```
 GET /api/export/:source/:sessionId
-  Query: ?format=csv|json|pdf
+  Query: ?format=json|markdown
   Response: File download
 ```
 
 ## Data Models
+
+### SubAgent
+
+```typescript
+interface SubAgent {
+  id: string;              // agentId (Copilot: toolCallId prefix; Claude: hex from filename)
+  agentId: string;         // human-readable name or same as id
+  agentType: string;       // e.g. "general-purpose", "explore", "task"
+  agentDisplayName: string; // title-cased display name
+  description?: string;
+  prompt?: string;         // task prompt given to the agent
+  status: 'started' | 'completed' | 'failed';
+  result?: string;         // final agent output (markdown)
+  model?: string;
+  totalTokens?: number;
+  totalToolCalls?: number;
+  durationMs?: number;
+  startTime: string;
+  endTime?: string;
+}
+```
 
 ### Session Summary
 
 ```typescript
 interface SessionSummary {
   id: string;
-  source: 'claude' | 'copilot';
+  source: 'claude' | 'copilot' | 'codex';
   project: string;
   projectPath: string;
   startTime: string;
   lastActivity: string;
   messageCount: number;
-  totalTokens?: number;  // Claude only
+  totalTokens?: number;
   model?: string;
+  subAgentCount?: number;  // number of subagents (if any)
 }
 ```
 
@@ -228,6 +339,7 @@ interface SessionDetail extends SessionSummary {
   messages: Message[];
   stats: SessionStats;
   toolUsage: ToolUsageSummary[];
+  subAgents?: SubAgent[];
 }
 ```
 
@@ -240,16 +352,17 @@ interface Message {
   role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   timestamp: string;
+  model?: string;
 
-  // Claude specific
   tokens?: {
     input: number;
     output: number;
     cacheRead?: number;
     cacheCreation?: number;
+    estimated?: boolean;  // true for Copilot (estimation model)
+    cost?: number;        // USD cost for this API call
   };
 
-  // Tool related
   toolCalls?: ToolCall[];
   toolResult?: ToolResult;
 }
@@ -275,26 +388,24 @@ interface SessionStats {
   userMessages: number;
   assistantMessages: number;
 
-  // Token stats (Claude only)
   tokens?: {
     totalInput: number;
     totalOutput: number;
-    totalCacheRead: number;
+    totalCacheRead: number;    // peak (MAX) for Claude; cumulative for Copilot/Codex
     totalCacheCreation: number;
+    totalCost?: number;        // total USD cost for the session
     inputPerMessage: number[];
     outputPerMessage: number[];
     cumulativeTokens: number[];
   };
 
-  // Tool stats
   tools: {
     name: string;
     count: number;
     successRate: number;
   }[];
 
-  // Timing
-  duration: number;  // ms
+  duration: number;           // ms
   averageTurnDuration?: number;
 }
 ```
@@ -306,6 +417,7 @@ interface AppConfig {
   paths: {
     claude: string[];
     copilot: string[];
+    codex: string[];
   };
   autoRefresh: boolean;
   refreshInterval: number;  // ms
@@ -314,29 +426,44 @@ interface AppConfig {
 }
 ```
 
+### WebSocket Messages
+
+```typescript
+interface WSMessage {
+  type: 'session_updated' | 'session_created' | 'session_deleted' | 'watch_status';
+  payload: {
+    source?: 'claude' | 'copilot' | 'codex';
+    sessionId?: string;
+    data?: SessionSummary;
+    active?: boolean;  // used by watch_status
+  };
+}
+```
+
 ## Frontend Components
 
 ### Layout
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│  Header: Logo, Search, [☀/🌙] Theme Toggle, Settings        │
-├──────────────┬─────────────────────────────────────────────┤
-│              │                                              │
-│   Sidebar    │              Main Content                    │
-│              │                                              │
-│  - Sessions  │  ┌────────────────────────────────────────┐ │
-│    List      │  │  Session Header (name, stats)           │ │
-│              │  ├────────────────────────────────────────┤ │
-│  - View      │  │  Tab Navigation                         │ │
-│    Toggle    │  │  [Timeline] [Charts] [Tree] [Raw]       │ │
-│              │  ├────────────────────────────────────────┤ │
-│  - Filters   │  │                                        │ │
-│              │  │  Active Tab Content                    │ │
-│              │  │                                        │ │
-│              │  │                                        │ │
-│              │  └────────────────────────────────────────┘ │
-└──────────────┴─────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│  Header: Logo, Search, [☀/🌙] Theme Toggle, Live/Offline, ⚙    │
+├──────────────────┬─────────────────────────────────────────────┤
+│                  │                                              │
+│     Sidebar      │              Main Content                   │
+│                  │                                              │
+│  [all][claude]   │  ┌──────────────────────────────────────┐   │
+│  [copilot][codex]│  │  Session Header (name, model, stats) │   │
+│                  │  ├──────────────────────────────────────┤   │
+│  [Date][Project] │  │  [Timeline][Charts][Tree][Raw]        │   │
+│                  │  ├──────────────────────────────────────┤   │
+│  Session list    │  │                                      │   │
+│  by group        │  │  Active Tab Content                  │   │
+│    ▸ Session A   │  │   OR SubAgentView (when selected)    │   │
+│    ▸ Session B   │  │                                      │   │
+│      ▾ 3 agents  │  └──────────────────────────────────────┘   │
+│        agent-1   │                                              │
+│        agent-2   │                                              │
+└──────────────────┴─────────────────────────────────────────────┘
 ```
 
 ### Component Tree
@@ -344,277 +471,151 @@ interface AppConfig {
 ```
 App.vue
 ├── AppHeader.vue
-│   ├── SearchBar.vue
-│   ├── ThemeToggle.vue
-│   └── SettingsToggle.vue
+│   ├── SearchBar.vue (common/)
+│   ├── ThemeToggle.vue (common/)
+│   └── Live/Offline watch toggle button
 ├── Sidebar.vue
-│   ├── SessionList.vue
-│   │   └── SessionListItem.vue
-│   ├── ViewToggle.vue (date/project)
-│   └── FilterPanel.vue
+│   ├── Source filter tabs [all|claude|copilot|codex]
+│   ├── View toggle [Date|Project]
+│   └── SessionList.vue
+│       └── SessionListItem.vue
+│           └── SubAgent expand/collapse list
 ├── MainContent.vue
-│   ├── SessionHeader.vue
-│   │   └── QuickStats.vue
-│   ├── TabNavigation.vue
-│   └── TabContent.vue
+│   ├── SubAgentView.vue (when subagent selected)
+│   └── Normal session view
+│       ├── Session header + quick stats bar
+│       ├── Tab navigation [Timeline|Charts|Tree|Raw]
 │       ├── TimelineView.vue
-│       │   └── MessageCard.vue
-│       │       ├── UserMessage.vue
-│       │       ├── AssistantMessage.vue
-│       │       └── ToolCallDisplay.vue
 │       ├── ChartsView.vue
-│       │   ├── TokenUsageChart.vue
-│       │   ├── ToolUsageChart.vue
-│       │   └── CumulativeChart.vue
 │       ├── TreeView.vue
-│       │   └── TreeNode.vue
 │       └── RawView.vue
-├── ContentPreviewModal.vue
-│   ├── MessageContent.vue
-│   ├── TokenBadge.vue
-│   └── ToolCallDetails.vue
-└── SettingsModal.vue
-    ├── PathsConfig.vue
-    └── PreferencesConfig.vue
+├── ContentPreviewModal.vue (modals/)
+│   └── TokenBadge.vue (common/)
+├── SettingsModal.vue (modals/)
+└── SubAgentModal.vue (modals/) [unused — superseded by SubAgentView]
 ```
+
+### SubAgentView
+
+Full-page view shown in `MainContent` when a subagent is selected from the sidebar.
+
+**Features:**
+- Breadcrumb header with back button (returns to session tabs)
+- Agent name, type badge, status badge
+- Stats bar: model · tokens · tool calls · duration
+- Collapsible prompt block (`<details>` element)
+- Markdown-rendered result block
+
+**Navigation:** Selecting a different session or clicking the back button calls `clearSubAgent()` in the Pinia store, returning to the normal session view.
+
+## Token Estimation (Copilot)
+
+Copilot CLI does not log exact input token counts per request. The parser uses a calibrated estimation model:
+
+- **`CHARS_PER_TOKEN = 3`** — validated against `session.compaction_start.conversationTokens` ground-truth data
+- **System overhead** defaults to `9,278` tokens; overridden by `systemTokens` from `compaction_start` events
+- **Tool definition overhead** defaults to `7,325` tokens; overridden by `toolDefinitionsTokens`
+- **Cache estimate**: system + tool overhead on turns after the first (0 for the first API call)
+- **Output tokens**: exact (`event.data.outputTokens` from `assistant.message` events)
+
+All estimated values are flagged `estimated: true` and shown with `~` in the UI.
 
 ## Real-time Updates
 
-The backend uses `chokidar` to watch session directories for changes. When a file changes:
+File watching is **disabled by default** (`WATCH_ENABLED=false`). Users can enable it via:
+- The **Live/Offline** toggle button in the app header
+- Setting `WATCH_ENABLED=true` environment variable at server startup
 
-1. Backend detects file change
-2. Parses the updated content
-3. Sends WebSocket message to connected clients
-4. Frontend updates the relevant session data
+When enabled, the backend uses `chokidar` to watch session directories. On file change:
+1. Backend detects change, invalidates session cache
+2. Parses updated content and broadcasts a `WSMessage` to all connected clients
+3. Frontend updates the session list and reloads the active session if needed
 
-```typescript
-// WebSocket message types
-interface WSMessage {
-  type: 'session_updated' | 'session_created' | 'session_deleted';
-  payload: {
-    source: 'claude' | 'copilot';
-    sessionId: string;
-    data?: SessionSummary;
-  };
-}
-```
+Toggle state is synced to clients via `watch_status` WebSocket messages.
 
-## Content Preview Modal
+## Cost Calculation
 
-A popup modal that displays full message content with token information when clicking on a message in the timeline or tree view.
+Session and per-message USD costs are calculated using the pricing table in `packages/server/src/pricing.ts`. Prices match the [GitHub Copilot Models and Pricing](https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing) page (per-million-token rates).
 
-### Features
-- **Full Content Display**: Shows complete message content with syntax highlighting for code blocks
-- **Token Badge**: Displays token counts prominently at the top
-  - Input tokens (with cache read breakdown)
-  - Output tokens (with cache creation breakdown)
-  - Total tokens for the message
-- **Tool Call Details**: Expandable sections showing tool inputs and outputs
-- **Navigation**: Previous/Next buttons to navigate between messages
-- **Copy Button**: Copy content to clipboard
-- **Keyboard Support**: Escape to close, arrow keys to navigate
+- Claude: cost calculated from exact API usage fields
+- Copilot: cost calculated from estimated input + exact output + estimated cache
+- Codex: cost calculated from `token_count` event totals
 
-### Layout
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│  [←] Message 5 of 23 [→]                              [✕]   │
-├──────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │  🔢 Tokens                                              │ │
-│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌──────────────┐  │ │
-│  │  │ Input   │ │ Output  │ │ Cache   │ │    Total     │  │ │
-│  │  │ 18,177  │ │   572   │ │ 15,427  │ │   18,749     │  │ │
-│  │  └─────────┘ └─────────┘ └─────────┘ └──────────────┘  │ │
-│  └─────────────────────────────────────────────────────────┘ │
-│                                                              │
-│  Role: assistant                    2026-02-06 12:43:17      │
-│  Model: claude-opus-4.5                                      │
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│  I'd be happy to help you create a context viewer web app   │
-│  for analyzing Claude Code and Copilot CLI sessions.        │
-│                                                              │
-│  ▼ Tool Call: AskUserQuestion                                │
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │  {                                                      │ │
-│  │    "questions": [...]                                   │ │
-│  │  }                                                      │ │
-│  └─────────────────────────────────────────────────────────┘ │
-│                                                              │
-├──────────────────────────────────────────────────────────────┤
-│                                           [📋 Copy] [Close] │
-└──────────────────────────────────────────────────────────────┘
-```
-
-### Component API
-
-```typescript
-interface ContentPreviewProps {
-  message: Message;
-  messageIndex: number;
-  totalMessages: number;
-  onClose: () => void;
-  onNavigate: (direction: 'prev' | 'next') => void;
-}
-
-interface TokenDisplayProps {
-  tokens: {
-    input: number;
-    output: number;
-    cacheRead?: number;
-    cacheCreation?: number;
-  };
-}
-```
-
-## Theme System
-
-### Theme Toggle Component
-
-A toggle button in the header that switches between light and dark themes.
-
-```
-Light Mode:  [☀️]  →  Click  →  [🌙]  Dark Mode
-```
-
-### Implementation
-
-```typescript
-// Theme types
-type Theme = 'light' | 'dark' | 'system';
-
-// Theme composable
-interface UseTheme {
-  theme: Ref<Theme>;
-  resolvedTheme: ComputedRef<'light' | 'dark'>;
-  toggleTheme: () => void;
-  setTheme: (theme: Theme) => void;
-}
-```
-
-### CSS Variables
-
-```css
-:root {
-  /* Light theme (default) */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f3f4f6;
-  --bg-tertiary: #e5e7eb;
-  --text-primary: #111827;
-  --text-secondary: #4b5563;
-  --text-muted: #9ca3af;
-  --border-color: #e5e7eb;
-  --accent-color: #3b82f6;
-  --accent-hover: #2563eb;
-  --success-color: #10b981;
-  --warning-color: #f59e0b;
-  --error-color: #ef4444;
-}
-
-.dark {
-  --bg-primary: #111827;
-  --bg-secondary: #1f2937;
-  --bg-tertiary: #374151;
-  --text-primary: #f9fafb;
-  --text-secondary: #d1d5db;
-  --text-muted: #6b7280;
-  --border-color: #374151;
-  --accent-color: #60a5fa;
-  --accent-hover: #3b82f6;
-  --success-color: #34d399;
-  --warning-color: #fbbf24;
-  --error-color: #f87171;
-}
-```
-
-### Tailwind Configuration
-
-```javascript
-// tailwind.config.js
-module.exports = {
-  darkMode: 'class',
-  theme: {
-    extend: {
-      colors: {
-        // Custom semantic colors that respect theme
-      }
-    }
-  }
-}
-```
-
-### Persistence
-
-Theme preference is saved to localStorage and restored on page load:
-
-```typescript
-const THEME_KEY = 'agent-context-viewer-theme';
-
-function loadTheme(): Theme {
-  return localStorage.getItem(THEME_KEY) as Theme || 'system';
-}
-
-function saveTheme(theme: Theme): void {
-  localStorage.setItem(THEME_KEY, theme);
-}
-```
+Cost fields: `Message.tokens.cost` (per message), `SessionStats.tokens.totalCost` (session total).
 
 ## Project Structure
 
 ```
 agent-session-viewer/
-├── package.json
-├── .env.example
 ├── README.md
+├── README.zh.md
+├── SPEC.md
+├── .env.example
 │
-├── server/
-│   ├── index.ts              # Entry point
-│   ├── config.ts             # Configuration management
-│   ├── routes/
-│   │   ├── sessions.ts       # Session API routes
-│   │   ├── config.ts         # Config API routes
-│   │   └── export.ts         # Export API routes
-│   ├── parsers/
-│   │   ├── index.ts          # Parser factory
-│   │   ├── claude.ts         # Claude Code parser
-│   │   └── copilot.ts        # Copilot CLI parser
-│   ├── services/
-│   │   ├── sessionService.ts # Session management
-│   │   ├── fileWatcher.ts    # File system watching
-│   │   └── exportService.ts  # Export generation
-│   └── types/
-│       └── index.ts          # Shared types
-│
-├── client/
-│   ├── index.html
-│   ├── vite.config.ts
-│   ├── tailwind.config.js
-│   ├── src/
-│   │   ├── main.ts
-│   │   ├── App.vue
-│   │   ├── components/
-│   │   │   ├── layout/
-│   │   │   ├── sessions/
-│   │   │   ├── views/
-│   │   │   └── common/
-│   │   ├── composables/
-│   │   │   ├── useSessions.ts
-│   │   │   ├── useWebSocket.ts
-│   │   │   ├── useTheme.ts
-│   │   │   └── usePreferences.ts
-│   │   ├── stores/
-│   │   │   ├── sessions.ts
-│   │   │   └── config.ts
-│   │   ├── types/
-│   │   │   └── index.ts
-│   │   └── utils/
-│   │       ├── formatters.ts
-│   │       └── colors.ts
-│   └── public/
-│
-└── shared/
-    └── types.ts              # Types shared between client/server
+└── packages/
+    ├── shared/
+    │   └── src/types.ts          # Types shared between client and server
+    │
+    ├── server/
+    │   └── src/
+    │       ├── index.ts          # Express + WS server entry point
+    │       ├── config.ts         # Environment config
+    │       ├── pricing.ts        # Token cost lookup table
+    │       ├── parsers/
+    │       │   ├── index.ts      # Parser factory + source detection
+    │       │   ├── claude.ts     # Claude Code parser + subagent loader
+    │       │   ├── copilot.ts    # Copilot CLI parser + token estimation
+    │       │   └── codex.ts      # Codex parser
+    │       ├── routes/
+    │       │   ├── sessions.ts   # Session CRUD routes
+    │       │   ├── config.ts     # App config routes
+    │       │   ├── export.ts     # Session export routes
+    │       │   └── watch.ts      # Live watch toggle routes
+    │       └── services/
+    │           ├── sessionService.ts  # Session scanning + caching
+    │           ├── fileWatcher.ts     # chokidar watcher + WS broadcast
+    │           └── exportService.ts   # JSON/Markdown export
+    │
+    └── client/
+        └── src/
+            ├── App.vue
+            ├── main.ts
+            ├── style.css
+            ├── components/
+            │   ├── common/
+            │   │   ├── SearchBar.vue
+            │   │   ├── ThemeToggle.vue
+            │   │   └── TokenBadge.vue
+            │   ├── layout/
+            │   │   ├── AppHeader.vue     # Live/Offline toggle + theme + search
+            │   │   ├── MainContent.vue   # Session tabs OR SubAgentView
+            │   │   └── Sidebar.vue       # Source filter + session list
+            │   ├── modals/
+            │   │   ├── ContentPreviewModal.vue
+            │   │   ├── SettingsModal.vue
+            │   │   └── SubAgentModal.vue (legacy, superseded)
+            │   ├── sessions/
+            │   │   ├── SessionList.vue
+            │   │   └── SessionListItem.vue  # Subagent expand list
+            │   └── views/
+            │       ├── ChartsView.vue
+            │       ├── RawView.vue
+            │       ├── SubAgentView.vue   # Full-page subagent detail
+            │       ├── TimelineView.vue
+            │       └── TreeView.vue
+            ├── composables/
+            │   ├── usePreferences.ts
+            │   ├── useSessions.ts
+            │   ├── useTheme.ts
+            │   └── useWebSocket.ts
+            ├── stores/
+            │   ├── sessions.ts   # Main Pinia store (sessions, subagents, watch, preview)
+            │   └── config.ts
+            ├── types/
+            │   └── index.ts      # Re-exports from shared package
+            └── utils/
+                ├── api.ts        # Fetch wrappers for all API endpoints
+                └── formatters.ts # Token, time, cost, duration formatters
 ```
 
 ## Configuration
@@ -622,16 +623,16 @@ agent-session-viewer/
 ### Environment Variables
 
 ```env
-# Server
 PORT=3000
 HOST=localhost
 
-# Session paths (comma-separated, optional - will auto-detect if not set)
+# Session paths (comma-separated; auto-detected if not set)
 CLAUDE_PATHS=
 COPILOT_PATHS=
+CODEX_PATHS=
 
-# File watching
-WATCH_ENABLED=true
+# File watching (disabled by default; enable at startup with =true)
+WATCH_ENABLED=false
 WATCH_DEBOUNCE_MS=500
 ```
 
@@ -640,72 +641,53 @@ WATCH_DEBOUNCE_MS=500
 **Windows:**
 - Claude: `%USERPROFILE%\.claude\projects\`
 - Copilot: `%USERPROFILE%\.copilot\session-state\`
+- Codex: `%USERPROFILE%\.codex\sessions\`
 
 **macOS/Linux:**
 - Claude: `~/.claude/projects/`
 - Copilot: `~/.copilot/session-state/`
+- Codex: `~/.codex/sessions/`
 
 ## Charts Specification
 
 ### Token Usage Over Time (Line Chart)
-- X-axis: Message index or timestamp
+- X-axis: Message index
 - Y-axis: Token count
 - Lines: Input tokens, Output tokens, Cache read, Cache creation
-- Interactive: Hover for details, click to jump to message
+- Interactive: Hover for details
 
 ### Cumulative Token Usage (Area Chart)
 - X-axis: Message index
 - Y-axis: Cumulative token count
-- Stacked areas: Input, Output, Cache
+- Stacked: Input + Output
 
-### Tool Usage Distribution (Bar/Pie Chart)
+### Tool Usage Distribution (Bar Chart)
 - Categories: Tool names
 - Values: Call count
-- Color coding: Success rate (green to red gradient)
 
 ### Message Distribution (Doughnut Chart)
-- Segments: User messages, Assistant messages, Tool calls, System messages
+- Segments: User / Assistant / Tool / System messages
 
 ## Export Formats
 
-### CSV Export
-```csv
-timestamp,role,content,input_tokens,output_tokens,tool_name,tool_success
-2026-02-06T12:43:13.503Z,user,"create a session viewer...",0,0,,
-2026-02-06T12:43:17.630Z,assistant,"I'd be happy to help...",18177,572,,
-```
-
 ### JSON Export
-Full session data with all messages and stats.
+Full `SessionDetail` object serialized as pretty-printed JSON.
 
-### PDF Export (future)
-Formatted report with:
-- Session summary
-- Token usage charts
-- Tool usage breakdown
-- Conversation transcript
+### Markdown Export
+Human-readable session transcript with token stats in a header block.
 
 ## Performance Considerations
 
-1. **Lazy Loading**: Only load message content when viewing a session
-2. **Pagination**: Limit messages loaded at once (50 default)
-3. **Caching**: Cache parsed session summaries in memory
-4. **Debouncing**: Debounce file watcher events (500ms default)
-5. **Virtual Scrolling**: Use virtual scrolling for long message lists
+1. **Separate loading states**: `loading` (session list) and `detailLoading` (session detail fetch) are separate flags to prevent the sidebar from re-rendering/scrolling on session selection.
+2. **Session cache**: Parsed `SessionDetail` objects are cached in memory by `sessionService.ts` and invalidated on file change.
+3. **Lazy loading**: Session detail is only fetched when a session is selected.
+4. **Debouncing**: File watcher events are debounced (`WATCH_DEBOUNCE_MS`, default 500 ms).
+5. **Subagent lazy load**: Subagent JSONL files are parsed when their parent session is loaded (not on initial list scan).
 
 ## Security Considerations
 
-1. **Path Validation**: Validate all file paths are within allowed directories
-2. **No Remote Access**: Bind to localhost by default
-3. **Read-Only**: Application only reads session files, never modifies them
-4. **Sanitization**: Sanitize content before rendering to prevent XSS
+1. **Path validation**: All file reads are restricted to configured session directories.
+2. **Localhost binding**: Server binds to `localhost` by default (no external access).
+3. **Read-only**: The application only reads session files; it never writes or modifies them.
+4. **No credentials**: Session files are read directly from the local filesystem without authentication.
 
-## Future Enhancements
-
-1. Session comparison view
-2. Search within sessions
-3. Cost estimation based on token usage
-4. Session tagging and notes
-5. Custom date range filtering
-6. Multiple window support
-7. Session replay mode

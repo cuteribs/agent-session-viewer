@@ -4,6 +4,8 @@
 
 一个用于分析和可视化 **Claude Code**、**Copilot CLI** 和 **Codex** 会话的 Web 应用。它提供了对 AI 代理交互过程的结构化展示，帮助你调试问题、分析成本，并回顾编码会话的上下文。
 
+![](assets/dark.webp)
+
 ## 功能特性
 
 -   **多 Agent 支持**：在同一界面中查看和分析来自 Claude Code、Copilot CLI 和 Codex 的会话。

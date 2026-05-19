@@ -4,6 +4,8 @@
 
 A web applicationfor analyzing and visualizing **Claude Code**, **Copilot CLI**, and **Codex** sessions. It provides a structured view of your AI agent interactions, making it easier to debug, understand costs, and review the context of your coding sessions.
 
+![](assets/light.webp)
+
 ## Features
 
 -   **Multi-Agent Support**: View and analyze sessions from Claude Code, Copilot CLI, and Codex in a single interface.
