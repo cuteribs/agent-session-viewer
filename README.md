@@ -1,6 +1,8 @@
 # Agent Session Viewer
 
-A web application for analyzing and visualizing **Claude Code**, **Copilot CLI**, and **Codex** sessions. It provides a structured view of your AI agent interactions, making it easier to debug, understand costs, and review the context of your coding sessions.
+**English** | [中文](./README.zh.md)
+
+A web applicationfor analyzing and visualizing **Claude Code**, **Copilot CLI**, and **Codex** sessions. It provides a structured view of your AI agent interactions, making it easier to debug, understand costs, and review the context of your coding sessions.
 
 ## Features
 
@@ -107,3 +109,55 @@ If you want to contribute or run the project from source:
     # Build server and copy client assets
     cd packages/server && npm run build && npm run build:public
     ```
+
+## Token Pricing Reference
+
+> Source: [GitHub Copilot – Models and Pricing](https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing)  
+> All prices are **per 1 million tokens**. 1 AI credit = $0.01 USD.
+
+### OpenAI
+
+| Model | Category | Input | Cached Input | Output |
+|---|---|---|---|---|
+| GPT-4.1 ¹ | Versatile | $2.00 | $0.50 | $8.00 |
+| GPT-5 mini ¹ | Lightweight | $0.25 | $0.025 | $2.00 |
+| GPT-5.2 | Versatile | $1.75 | $0.175 | $14.00 |
+| GPT-5.2-Codex | Powerful | $1.75 | $0.175 | $14.00 |
+| GPT-5.3-Codex | Powerful | $1.75 | $0.175 | $14.00 |
+| GPT-5.4 ² | Versatile | $2.50 | $0.25 | $15.00 |
+| GPT-5.4 mini | Lightweight | $0.75 | $0.075 | $4.50 |
+| GPT-5.4 nano | Lightweight | $0.20 | $0.02 | $1.25 |
+| GPT-5.5 | Powerful | $5.00 | $0.50 | $30.00 |
+
+### Anthropic
+
+Anthropic models include an additional **cache write** cost.
+
+| Model | Category | Input | Cached Input | Cache Write | Output |
+|---|---|---|---|---|---|
+| Claude Haiku 4.5 | Versatile | $1.00 | $0.10 | $1.25 | $5.00 |
+| Claude Sonnet 4 | Versatile | $3.00 | $0.30 | $3.75 | $15.00 |
+| Claude Sonnet 4.5 | Versatile | $3.00 | $0.30 | $3.75 | $15.00 |
+| Claude Sonnet 4.6 | Versatile | $3.00 | $0.30 | $3.75 | $15.00 |
+| Claude Opus 4.5 | Powerful | $5.00 | $0.50 | $6.25 | $25.00 |
+| Claude Opus 4.6 | Powerful | $5.00 | $0.50 | $6.25 | $25.00 |
+| Claude Opus 4.7 | Powerful | $5.00 | $0.50 | $6.25 | $25.00 |
+
+### Google
+
+| Model | Category | Input | Cached Input | Output |
+|---|---|---|---|---|
+| Gemini 2.5 Pro ³ | Powerful | $1.25 | $0.125 | $10.00 |
+| Gemini 3 Flash | Lightweight | $0.50 | $0.05 | $3.00 |
+| Gemini 3.1 Pro ³ | Powerful | $2.00 | $0.20 | $12.00 |
+
+### Fine-tuned (GitHub)
+
+| Model | Category | Input | Cached Input | Output |
+|---|---|---|---|---|
+| Raptor mini | Versatile | $0.25 | $0.025 | $2.00 |
+| Goldeneye | Powerful | $1.25 | $0.125 | $10.00 |
+
+> ¹ GPT-4.1 and GPT-5 mini are included models (no extra credit charge on paid plans).  
+> ² GPT-5.4 pricing applies to prompts with ≤272K tokens.  
+> ³ Gemini 2.5 Pro and Gemini 3.1 Pro pricing applies to prompts with ≤200K tokens.
