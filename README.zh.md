@@ -2,13 +2,13 @@
 
 [English](./README.md) | **中文**
 
-一个用于分析和可视化 **Claude Code**、**Copilot CLI** 和 **Codex** 会话的 Web 应用。它提供了对 AI 代理交互过程的结构化展示，帮助你调试问题、分析成本，并回顾编码会话的上下文。
+一个用于分析和可视化 **Claude Code**、**Copilot CLI**、**Codex** 和 **OpenCode** 会话的 Web 应用。它提供了对 AI 代理交互过程的结构化展示，帮助你调试问题、分析成本，并回顾编码会话的上下文。
 
 ![](assets/dark.webp)
 
 ## 功能特性
 
--   **多 Agent 支持**：在同一界面中查看和分析来自 Claude Code、Copilot CLI 和 Codex 的会话。
+-   **多 Agent 支持**：在同一界面中查看和分析来自 Claude Code、Copilot CLI、Codex 和 OpenCode 的会话。
 -   **子 Agent 展开查看**：对于通过 `task`/`Agent` 工具启动了子 Agent 的会话，侧边栏会显示可展开的子 Agent 列表。点击任意子 Agent 可进入全页视图，展示其提示词、执行结果、Token 统计和工具调用次数。
 -   **Token 用量与成本**：按消息和累计显示输入/输出/缓存 Token 数量，以及每条消息和整个会话的预估 USD 成本。Claude Code 和 Codex 使用精确 Token 数；Copilot 会话使用校准后的估算模型。
 -   **会话时间线**：以清晰的时间线展示完整对话历史，工具调用按名称分组汇总。
@@ -29,7 +29,7 @@ npx @cuteribs/agent-session-viewer
 这将会：
 1.  启动本地服务器。
 2.  自动在默认浏览器中打开 Web 界面。
-3.  读取默认的 Claude、Copilot 和 Codex 会话目录。
+3.  读取默认的 Claude、Copilot、Codex 和 OpenCode 会话目录。
 
 ### 配置
 
@@ -37,6 +37,7 @@ npx @cuteribs/agent-session-viewer
 -   Claude：`~/.claude/projects`
 -   Copilot：`~/.copilot/session-state`
 -   Codex：`~/.codex/sessions`
+-   OpenCode：`~/.config/opencode/sessions`
 
 可通过环境变量覆盖上述路径或端口号。将 `.env.example` 复制为 `.env` 并按需修改：
 
@@ -46,6 +47,7 @@ npx @cuteribs/agent-session-viewer
 | `CLAUDE_PATHS` | `~/.claude/projects` | Claude 会话目录，多个路径用逗号分隔 |
 | `COPILOT_PATHS` | `~/.copilot/session-state` | Copilot 会话目录，多个路径用逗号分隔 |
 | `CODEX_PATHS` | `~/.codex/sessions` | Codex 会话目录，多个路径用逗号分隔 |
+| `OPENCODE_PATHS` | `~/.config/opencode/sessions` | OpenCode 会话目录，多个路径用逗号分隔 |
 | `WATCH_ENABLED` | `false` | 设为 `true` 可在启动时开启实时文件监听 |
 
 ## 支持的会话格式
@@ -64,6 +66,9 @@ Copilot 的 Token 数量为**估算值**（会话日志中不包含精确的 API
 
 ### Codex
 会话以 `.jsonl` 文件形式存储在 `~/.codex/sessions/{year}/{month}/{day}/` 下。格式包括：`session_meta`（元数据）、`event_msg`（用户和 Agent 消息、Token 统计、任务生命周期）、`response_item`（工具调用及输出）以及 `turn_context`（模型和配置信息）。Token 用量从 `token_count` 事件中提取。
+
+### OpenCode
+会话以 SQLite 数据库文件形式存储在 `~/.config/opencode/sessions/` 下。查看器直接读取数据库中的会话元数据、消息和工具调用信息，并逐条提取 Token 用量和成本数据进行详细分析。
 
 ## 开发指南
 
