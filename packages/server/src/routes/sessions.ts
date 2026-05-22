@@ -14,7 +14,7 @@ export const sessionsRouter = Router();
 // GET /api/sessions - List all sessions
 sessionsRouter.get('/', (req, res) => {
   try {
-    const source = req.query.source as 'claude' | 'copilot' | 'codex' | 'all' | undefined;
+    const source = req.query.source as 'claude' | 'copilot' | 'codex' | 'opencode' | 'all' | undefined;
     const sessions = listSessions(source);
     res.json(sessions);
   } catch (error) {
@@ -28,8 +28,8 @@ sessionsRouter.get('/:source/:sessionId', (req, res) => {
   try {
     const { source, sessionId } = req.params;
 
-    if (source !== 'claude' && source !== 'copilot' && source !== 'codex') {
-      res.status(400).json({ error: 'Bad request', message: 'Invalid source. Must be "claude", "copilot", or "codex"' });
+    if (source !== 'claude' && source !== 'copilot' && source !== 'codex' && source !== 'opencode') {
+      res.status(400).json({ error: 'Bad request', message: 'Invalid source. Must be "claude", "copilot", "codex", or "opencode"' });
       return;
     }
 
@@ -54,8 +54,8 @@ sessionsRouter.get('/:source/:sessionId/messages', (req, res) => {
     const offset = parseInt(req.query.offset as string) || 0;
     const limit = parseInt(req.query.limit as string) || 50;
 
-    if (source !== 'claude' && source !== 'copilot' && source !== 'codex') {
-      res.status(400).json({ error: 'Bad request', message: 'Invalid source. Must be "claude", "copilot", or "codex"' });
+    if (source !== 'claude' && source !== 'copilot' && source !== 'codex' && source !== 'opencode') {
+      res.status(400).json({ error: 'Bad request', message: 'Invalid source. Must be "claude", "copilot", "codex", or "opencode"' });
       return;
     }
 
@@ -72,8 +72,8 @@ sessionsRouter.get('/:source/:sessionId/stats', (req, res) => {
   try {
     const { source, sessionId } = req.params;
 
-    if (source !== 'claude' && source !== 'copilot' && source !== 'codex') {
-      res.status(400).json({ error: 'Bad request', message: 'Invalid source. Must be "claude", "copilot", or "codex"' });
+    if (source !== 'claude' && source !== 'copilot' && source !== 'codex' && source !== 'opencode') {
+      res.status(400).json({ error: 'Bad request', message: 'Invalid source. Must be "claude", "copilot", "codex", or "opencode"' });
       return;
     }
 
@@ -96,8 +96,8 @@ sessionsRouter.delete('/:source/:sessionId', (req, res) => {
   try {
     const { source, sessionId } = req.params;
 
-    if (source !== 'claude' && source !== 'copilot' && source !== 'codex') {
-      res.status(400).json({ error: 'Bad request', message: 'Invalid source. Must be "claude", "copilot", or "codex"' });
+    if (source !== 'claude' && source !== 'copilot' && source !== 'codex' && source !== 'opencode') {
+      res.status(400).json({ error: 'Bad request', message: 'Invalid source. Must be "claude", "copilot", "codex", or "opencode"' });
       return;
     }
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useSessionsStore } from '@/stores/sessions'
-import { formatDateTime, formatDuration, formatCost } from '@/utils/formatters'
+import { formatDateTime, formatDuration, formatCost, getSourceBgColor } from '@/utils/formatters'
 import { getExportURL } from '@/utils/api'
 import TimelineView from '@/components/views/TimelineView.vue'
 import ChartsView from '@/components/views/ChartsView.vue'
@@ -64,11 +64,7 @@ function handleExport(format: 'csv' | 'json') {
           <div>
             <div class="flex items-center gap-2">
               <span
-                :class="[
-                  'px-2 py-0.5 text-xs font-medium rounded-full text-white',
-                  session.source === 'claude' ? 'bg-orange-500' :
-                  session.source === 'codex' ? 'bg-blue-500' : 'bg-purple-500'
-                ]"
+                :class="['px-2 py-0.5 text-xs font-medium rounded-full text-white', getSourceBgColor(session.source)]"
               >
                 {{ session.source }}
               </span>

@@ -79,6 +79,108 @@ export interface CodexTurnContext {
   effort?: string;
 }
 
+// ============================================
+// OpenCode Raw Data Schemas
+// ============================================
+
+export interface OpenCodeSession {
+  id: string;
+  slug?: string;
+  version?: string;
+  projectID: string;
+  directory: string;
+  parentID?: string;
+  title?: string;
+  time: {
+    created: number;
+    updated: number;
+  };
+  summary?: {
+    additions: number;
+    deletions: number;
+    files: number;
+  };
+}
+
+export interface OpenCodeMessage {
+  id: string;
+  sessionID: string;
+  role: 'user' | 'assistant';
+  time: {
+    created: number;
+    completed?: number;
+  };
+  parentID?: string;
+  modelID?: string;
+  providerID?: string;
+  agent?: string;
+  mode?: string;
+  path?: {
+    cwd: string;
+    root: string;
+  };
+  cost?: number;
+  tokens?: {
+    total: number;
+    input: number;
+    output: number;
+    reasoning?: number;
+    cache: {
+      read: number;
+      write: number;
+    };
+  };
+  finish?: 'stop' | 'tool-calls' | 'error';
+  error?: string;
+  variant?: string;
+  summary?: {
+    title?: string;
+    diffs?: unknown[];
+  };
+  model?: {
+    providerID?: string;
+    modelID?: string;
+  };
+}
+
+export interface OpenCodePart {
+  id: string;
+  sessionID: string;
+  messageID: string;
+  type: 'text' | 'tool' | 'step-start' | 'step-finish' | 'reasoning';
+  text?: string;
+  callID?: string;
+  tool?: string;
+  state?: {
+    status: string;
+    input?: unknown;
+    output?: string;
+    title?: string;
+    metadata?: Record<string, unknown>;
+    time?: {
+      start: number;
+      end: number;
+    };
+    attachments?: unknown[];
+  };
+  reason?: string;
+  cost?: number;
+  tokens?: {
+    total: number;
+    input: number;
+    output: number;
+    reasoning?: number;
+    cache: {
+      read: number;
+      write: number;
+    };
+  };
+  time?: {
+    start: number;
+    end: number;
+  };
+}
+
 export interface ClaudeCodeEntry {
   type: 'user' | 'assistant' | 'system' | 'file-history-snapshot' | 'attachment';
   uuid: string;
@@ -231,7 +333,7 @@ export interface SubAgent {
 
 export interface SessionSummary {
   id: string;
-  source: 'claude' | 'copilot' | 'codex';
+  source: 'claude' | 'copilot' | 'codex' | 'opencode';
   project: string;
   projectPath: string;
   startTime: string;
@@ -326,6 +428,7 @@ export interface AppConfig {
     claude: string[];
     copilot: string[];
     codex: string[];
+    opencode: string[];
   };
   autoRefresh: boolean;
   refreshInterval: number;
@@ -340,7 +443,7 @@ export interface AppConfig {
 export interface WSMessage {
   type: 'session_updated' | 'session_created' | 'session_deleted' | 'watch_status';
   payload: {
-    source?: 'claude' | 'copilot' | 'codex';
+    source?: 'claude' | 'copilot' | 'codex' | 'opencode';
     sessionId?: string;
     data?: SessionSummary;
     active?: boolean;
@@ -355,6 +458,7 @@ export interface PathsResponse {
   claude: string[];
   copilot: string[];
   codex: string[];
+  opencode: string[];
 }
 
 export interface ApiError {

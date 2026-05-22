@@ -136,6 +136,25 @@ onUnmounted(() => {
                     Loading...
                   </div>
                 </div>
+
+                <div>
+                  <label class="block text-xs text-muted mb-1">OpenCode Sessions</label>
+                  <div v-if="configStore.paths" class="space-y-1">
+                    <div
+                      v-for="path in configStore.paths.opencode"
+                      :key="path"
+                      class="flex items-center gap-2 px-3 py-2 bg-tertiary rounded text-sm"
+                    >
+                      <svg class="w-4 h-4 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
+                      <span class="flex-1 truncate text-primary">{{ path }}</span>
+                    </div>
+                  </div>
+                  <div v-else class="px-3 py-2 bg-tertiary rounded text-sm text-muted">
+                    Loading...
+                  </div>
+                </div>
               </div>
 
               <p class="mt-2 text-xs text-muted">
@@ -149,7 +168,7 @@ onUnmounted(() => {
               <div class="text-sm text-secondary space-y-1">
                 <p>Agent Session Viewer v1.0.0</p>
                 <p class="text-xs text-muted">
-                  Analyze and visualize Claude Code, Copilot CLI, and Codex sessions.
+                  Analyze and visualize Claude Code, Copilot CLI, Codex, and OpenCode sessions.
                 </p>
               </div>
             </div>

@@ -12,7 +12,7 @@ export const useSessionsStore = defineStore('sessions', () => {
   /** Separate loading flag for fetching session detail — does not hide the sidebar list */
   const detailLoading = ref(false)
   const error = ref<string | null>(null)
-  const sourceFilter = ref<'all' | 'claude' | 'copilot' | 'codex'>('all')
+  const sourceFilter = ref<'all' | 'claude' | 'copilot' | 'codex' | 'opencode'>('all')
   const searchQuery = ref('')
   const activeView = ref<ViewMode>('timeline')
   const previewMessage = ref<Message | null>(null)
@@ -87,7 +87,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     }
   }
 
-  async function selectSession(source: 'claude' | 'copilot' | 'codex', sessionId: string) {
+  async function selectSession(source: 'claude' | 'copilot' | 'codex' | 'opencode', sessionId: string) {
     detailLoading.value = true
     error.value = null
     try {
@@ -103,7 +103,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     currentSession.value = null
   }
 
-  function setSourceFilter(filter: 'all' | 'claude' | 'copilot' | 'codex') {
+  function setSourceFilter(filter: 'all' | 'claude' | 'copilot' | 'codex' | 'opencode') {
     sourceFilter.value = filter
     loadSessions()
   }
@@ -132,7 +132,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     showSettings.value = false
   }
 
-  async function removeSession(source: 'claude' | 'copilot' | 'codex', sessionId: string) {
+  async function removeSession(source: 'claude' | 'copilot' | 'codex' | 'opencode', sessionId: string) {
     loading.value = true
     error.value = null
     try {
@@ -220,7 +220,7 @@ export const useSessionsStore = defineStore('sessions', () => {
               currentSession.value.source === msg.payload.source
             ) {
               console.log('Reloading current session due to update')
-              selectSession(msg.payload.source as 'claude' | 'copilot' | 'codex', msg.payload.sessionId)
+              selectSession(msg.payload.source as 'claude' | 'copilot' | 'codex' | 'opencode', msg.payload.sessionId)
             }
           }
           break

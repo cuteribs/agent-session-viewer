@@ -1,7 +1,7 @@
 import { readdirSync, statSync, existsSync, openSync, readSync, closeSync } from 'fs';
 import { join, basename } from 'path';
 import { getServerConfig } from '../config.js';
-import { parseSessionFile, getSessionSummary, type SessionSource } from '../parsers/index.js';
+import { parseSessionFile, getSessionSummary, listOpenCodeDbSessionIds, type SessionSource } from '../parsers/index.js';
 import type { SessionSummary, SessionDetail, Message } from '../types/index.js';
 
 // Cache for parsed sessions
@@ -21,12 +21,18 @@ export function invalidateSession(source: SessionSource, sessionId: string): voi
 
 export function findSessionFiles(source: SessionSource): Map<string, string> {
   const config = getServerConfig();
-  const paths =
-    source === 'claude'
-      ? config.paths.claude
-      : source === 'copilot'
-        ? config.paths.copilot
-        : config.paths.codex;
+  let paths: string[];
+  if (source === 'claude') {
+    paths = config.paths.claude;
+  } else if (source === 'copilot') {
+    paths = config.paths.copilot;
+  } else if (source === 'codex') {
+    paths = config.paths.codex;
+  } else if (source === 'opencode') {
+    paths = config.paths.opencode;
+  } else {
+    paths = [];
+  }
   const files = new Map<string, string>();
 
   for (const basePath of paths) {
@@ -35,14 +41,13 @@ export function findSessionFiles(source: SessionSource): Map<string, string> {
     }
 
     if (source === 'claude') {
-      // Claude: ~/.claude/projects/{encoded-project-path}/*.jsonl
       findClaudeSessionFiles(basePath, files);
     } else if (source === 'copilot') {
-      // Copilot: ~/.copilot/session-state/{session-id}/events.jsonl
       findCopilotSessionFiles(basePath, files);
-    } else {
-      // Codex: ~/.codex/sessions/{year}/{month}/{day}/*.jsonl
+    } else if (source === 'codex') {
       findCodexSessionFiles(basePath, files);
+    } else if (source === 'opencode') {
+      findOpenCodeSessionFiles(basePath, files);
     }
   }
 
@@ -120,6 +125,45 @@ function findCodexSessionFiles(basePath: string, files: Map<string, string>): vo
   scanDir(basePath, 0);
 }
 
+function findOpenCodeSessionFiles(basePath: string, files: Map<string, string>): void {
+  // SQLite database (primary source for current sessions)
+  try {
+    const dbPath = join(basePath, '..', 'opencode.db');
+    if (existsSync(dbPath)) {
+      const sessionIds = listOpenCodeDbSessionIds();
+      for (const sessionId of sessionIds) {
+        files.set(sessionId, `db::${sessionId}`);
+      }
+    }
+  } catch (error) {
+    console.error(`Error querying OpenCode DB from ${basePath}:`, error);
+  }
+
+  // JSON files (legacy fallback for pre-migration sessions)
+  const sessionDir = join(basePath, 'session');
+  if (!existsSync(sessionDir)) return;
+
+  try {
+    const projectDirs = readdirSync(sessionDir);
+    for (const projectDir of projectDirs) {
+      const projectPath = join(sessionDir, projectDir);
+      const stat = statSync(projectPath);
+      if (!stat.isDirectory()) continue;
+
+      const sessionFiles = readdirSync(projectPath).filter(f => f.endsWith('.json'));
+      for (const sessionFile of sessionFiles) {
+        const filePath = join(projectPath, sessionFile);
+        const sessionId = basename(sessionFile, '.json');
+        if (!files.has(sessionId)) {
+          files.set(sessionId, filePath);
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`Error scanning OpenCode sessions at ${basePath}:`, error);
+  }
+}
+
 function extractCodexSessionId(filePath: string): string | null {
   try {
     // Read only the first 256 bytes - the session ID appears early in session_meta line
@@ -138,10 +182,10 @@ function extractCodexSessionId(filePath: string): string | null {
   return null;
 }
 
-export function listSessions(source?: 'claude' | 'copilot' | 'codex' | 'all'): SessionSummary[] {
+export function listSessions(source?: 'claude' | 'copilot' | 'codex' | 'opencode' | 'all'): SessionSummary[] {
   const sessions: SessionSummary[] = [];
   const sources: SessionSource[] =
-    source === 'all' || !source ? ['claude', 'copilot', 'codex'] : [source];
+    source === 'all' || !source ? ['claude', 'copilot', 'codex', 'opencode'] : [source];
 
   for (const src of sources) {
     const files = findSessionFiles(src);

@@ -16,6 +16,7 @@ export function initFileWatcher(broadcast: BroadcastFn): void {
     ...config.paths.claude.map(p => `${p}/**/*.jsonl`),
     ...config.paths.copilot.map(p => `${p}/**/events.jsonl`),
     ...config.paths.codex.map(p => `${p}/**/*.jsonl`),
+    ...config.paths.opencode.map(p => `${p}/session/**/*.json`),
   ];
 
   console.log('Initializing file watcher for:', watchPaths);
@@ -117,6 +118,12 @@ function determineSource(
     }
   }
 
+  for (const opencodePath of config.paths.opencode) {
+    if (normalizedPath.includes(opencodePath.replace(/\\/g, '/'))) {
+      return 'opencode';
+    }
+  }
+
   // Fallback: check path patterns
   if (normalizedPath.includes('.claude/projects')) {
     return 'claude';
@@ -127,21 +134,27 @@ function determineSource(
   if (normalizedPath.includes('.codex/sessions')) {
     return 'codex';
   }
+  if (normalizedPath.includes('.local/share/opencode/storage')) {
+    return 'opencode';
+  }
+  if (normalizedPath.includes('\\.local\\share\\opencode\\storage')) {
+    return 'opencode';
+  }
 
   return null;
 }
 
 function extractSessionId(filePath: string, source: SessionSource): string | null {
   if (source === 'claude') {
-    // Claude: /{project}/{sessionId}.jsonl
     return basename(filePath, '.jsonl');
   } else if (source === 'codex') {
-    // Codex: /{year}/{month}/{day}/{name}.jsonl
     return basename(filePath, '.jsonl');
-  } else {
-    // Copilot: /{sessionId}/events.jsonl
+  } else if (source === 'copilot') {
     return basename(dirname(filePath));
+  } else if (source === 'opencode') {
+    return basename(filePath, '.json');
   }
+  return null;
 }
 
 export function isWatcherRunning(): boolean {
