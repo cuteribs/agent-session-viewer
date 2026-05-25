@@ -1,6 +1,6 @@
 {
   "name": "@cuteribs/agent-session-viewer",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Web application for analyzing Claude Code and Copilot CLI sessions",
   "repository": {
     "type": "git",
@@ -28,7 +28,6 @@
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "open": "^10.0.3",
-    "shared": "file:../shared",
     "ws": "^8.16.0"
   },
   "devDependencies": {
@@ -37,6 +36,7 @@
     "@types/node": "^20.10.6",
     "@types/ws": "^8.5.10",
     "copyfiles": "^2.4.1",
+    "shared": "file:../shared",
     "tsup": "^8.5.1",
     "tsx": "^4.7.0",
     "typescript": "^5.9.3"

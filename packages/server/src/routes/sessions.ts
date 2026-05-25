@@ -1,11 +1,13 @@
 import { Router } from 'express';
-import { unlinkSync } from 'fs';
+import { unlinkSync, existsSync, rmSync } from 'fs';
+import { dirname, basename, join } from 'path';
 import {
   listSessions,
   getSession,
   getSessionMessages,
   getSessionStats,
   findSessionFiles,
+  invalidateSession,
 } from '../services/sessionService.js';
 import type { SessionSource } from '../parsers/index.js';
 
@@ -110,13 +112,34 @@ sessionsRouter.delete('/:source/:sessionId', (req, res) => {
       return;
     }
 
-    // Delete the file
+    // Delete the file and all related files/directories based on source
     try {
-      unlinkSync(filePath);
-      console.log(`Deleted session file: ${filePath}`);
+      if (source === 'copilot') {
+        // Copilot: delete the entire session directory (<basePath>/<sessionId>/)
+        const sessionDir = dirname(filePath);
+        rmSync(sessionDir, { recursive: true, force: true });
+        console.log(`Deleted Copilot session directory: ${sessionDir}`);
+      } else if (source === 'claude') {
+        // Claude: delete the .jsonl file and the sibling subagents directory if present
+        unlinkSync(filePath);
+        const subagentsDir = join(dirname(filePath), basename(filePath, '.jsonl'));
+        if (existsSync(subagentsDir)) {
+          rmSync(subagentsDir, { recursive: true, force: true });
+          console.log(`Deleted Claude subagents directory: ${subagentsDir}`);
+        }
+        console.log(`Deleted Claude session file: ${filePath}`);
+      } else {
+        // Codex (and any future sources): just delete the single file
+        unlinkSync(filePath);
+        console.log(`Deleted session file: ${filePath}`);
+      }
+
+      // Evict from in-memory cache so the deleted session is no longer served
+      invalidateSession(source as SessionSource, sessionId);
+
       res.json({ success: true, message: 'Session deleted successfully' });
     } catch (deleteError) {
-      console.error(`Failed to delete session file ${filePath}:`, deleteError);
+      console.error(`Failed to delete session ${sessionId}:`, deleteError);
       res.status(500).json({ error: 'Internal server error', message: 'Failed to delete session file' });
     }
   } catch (error) {

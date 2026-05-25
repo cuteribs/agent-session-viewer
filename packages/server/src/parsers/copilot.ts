@@ -88,6 +88,8 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
     // ---------------------------------------------------------------
     const toolUsageMap = new Map<string, { count: number; successes: number }>();
     const toolResultsById = new Map<string, ToolResult>();
+    /** toolCallId → toolName  (populated from tool.execution_start, used in tool.execution_complete) */
+    const toolNamesById = new Map<string, string>();
     const subAgentMap = new Map<string, SubAgent>();
     const subAgentByName = new Map<string, SubAgent>();
 
@@ -98,6 +100,12 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
         toolDefsOverhead = event.data.toolDefinitionsTokens ?? DEFAULT_TOOL_DEFS_TOKENS;
         toolDefsSet = true;
       }
+
+      // Capture tool name from the start event (not available on complete event)
+      if (event.type === 'tool.execution_start' && event.data.toolCallId && event.data.toolName) {
+        toolNamesById.set(event.data.toolCallId, event.data.toolName);
+      }
+
       if (event.type === 'tool.execution_complete' && event.data.toolCallId) {
         toolResultsById.set(event.data.toolCallId, {
           toolCallId: event.data.toolCallId,
@@ -105,7 +113,8 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
           content: event.data.result?.content || '',
         });
 
-        const toolName = event.data.toolName || 'unknown';
+        // Prefer name from the paired start event, fall back to data.toolName
+        const toolName = toolNamesById.get(event.data.toolCallId) || event.data.toolName || 'unknown';
         const existing = toolUsageMap.get(toolName) || { count: 0, successes: 0 };
         existing.count++;
         if (event.data.success !== false) {
