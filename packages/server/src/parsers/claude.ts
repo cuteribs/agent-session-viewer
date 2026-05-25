@@ -309,6 +309,48 @@ function parseClaudeSubagentFile(filePath: string): SubAgent | null {
     const endTime = entries[entries.length - 1].timestamp;
     const durationMs = new Date(endTime).getTime() - new Date(startTime).getTime();
 
+    // Build per-message timeline (same logic as the main session parser)
+    const messages: Message[] = [];
+    for (const entry of entries) {
+      if (entry.type === 'system' && entry.subtype === 'turn_duration') continue;
+      if (entry.type === 'file-history-snapshot') continue;
+      if (!entry.message) continue;
+
+      const { message } = entry;
+      const contentBlocks = normalizeContent(message.content);
+      const textContent = extractTextContent(contentBlocks);
+      const toolCalls = extractToolCalls(contentBlocks);
+
+      const tokens = message.usage
+        ? {
+            input: message.usage.input_tokens,
+            output: message.usage.output_tokens,
+            cacheRead: message.usage.cache_read_input_tokens,
+            cacheCreation: message.usage.cache_creation_input_tokens,
+            cost: calculateCost(
+              {
+                input: message.usage.input_tokens,
+                output: message.usage.output_tokens,
+                cacheRead: message.usage.cache_read_input_tokens,
+                cacheCreation: message.usage.cache_creation_input_tokens,
+              },
+              message.model ?? model
+            ),
+          }
+        : undefined;
+
+      messages.push({
+        id: entry.uuid,
+        parentId: entry.parentUuid,
+        role: message.role,
+        content: textContent,
+        timestamp: entry.timestamp,
+        model: message.model,
+        tokens,
+        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+      });
+    }
+
     return {
       id: agentId,
       agentId,
@@ -323,6 +365,7 @@ function parseClaudeSubagentFile(filePath: string): SubAgent | null {
       durationMs: durationMs > 0 ? durationMs : undefined,
       startTime,
       endTime,
+      messages,
     };
   } catch (error) {
     console.error(`Error parsing Claude subagent file ${filePath}:`, error);

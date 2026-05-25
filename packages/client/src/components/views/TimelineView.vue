@@ -5,19 +5,23 @@ import type { SessionDetail, Message, ToolCall } from '@/types'
 import { watch, nextTick, computed } from 'vue'
 
 const props = defineProps<{
-  session: SessionDetail
+  session?: SessionDetail
+  /** Override the message list (used when showing subagent message logs). */
+  messages?: Message[]
 }>()
 
 const sessionsStore = useSessionsStore()
 
+const displayMessages = computed(() => props.messages ?? props.session?.messages ?? [])
+
 // Reverse messages for display (newest first)
 const reversedMessages = computed(() => {
-  return [...props.session.messages].reverse()
+  return [...displayMessages.value].reverse()
 })
 
 // Scroll to selected message when selectedMessageIndex changes
 watch(() => sessionsStore.selectedMessageIndex, async (newIndex) => {
-  if (newIndex !== null && newIndex >= 0 && newIndex < props.session.messages.length) {
+  if (newIndex !== null && newIndex >= 0 && newIndex < displayMessages.value.length) {
     await nextTick()
     const element = document.querySelector(`[data-message-index="${newIndex}"]`)
     if (element) {
@@ -78,7 +82,7 @@ function summarizeArgs(args: Record<string, unknown>): string {
       <!-- Message header -->
       <div class="flex items-center justify-between px-4 py-2 bg-tertiary/50">
         <div class="flex items-center gap-3">
-          <span class="text-xs text-muted">#{{ props.session.messages.length - index }}</span>
+          <span class="text-xs text-muted">#{{ displayMessages.length - index }}</span>
           <span
             :class="[
               'px-2 py-0.5 text-xs font-medium rounded text-white capitalize',

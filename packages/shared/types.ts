@@ -127,6 +127,12 @@ export interface CopilotEvent {
   id: string;
   parentId: string | null;
   timestamp: string;
+  /**
+   * Root-level agentId: set on events that belong to a subagent context
+   * (assistant.message, tool.execution_start/complete, subagent.completed).
+   * Matches the toolCallId used to start the subagent via tool.execution_start.
+   */
+  agentId?: string;
   data: {
     // session.start
     sessionId?: string;
@@ -149,6 +155,10 @@ export interface CopilotEvent {
     toolRequests?: ToolRequest[];
     reasoningText?: string;
     outputTokens?: number;
+    // patched exact token fields may appear on assistant.message and subagent.completed
+    input_tokens?: number;
+    output_tokens?: number;
+    cache_read_tokens?: number;
     requestId?: string;
     interactionId?: string;
     turnId?: string;
@@ -227,6 +237,8 @@ export interface SubAgent {
   durationMs?: number;
   startTime: string;
   endTime?: string;
+  /** Chronological message log for this subagent (assistant turns + tool results). */
+  messages?: Message[];
 }
 
 export interface SessionSummary {
@@ -256,6 +268,12 @@ export interface Message {
   content: string;
   timestamp: string;
   model?: string;
+  /**
+   * For role:'system' messages that represent a subagent completion event,
+   * this holds the subagent's toolCallId (key in SubAgent.id) so the UI
+   * can render it as a subagent summary card.
+   */
+  subAgentRef?: string;
 
   tokens?: {
     input: number;
