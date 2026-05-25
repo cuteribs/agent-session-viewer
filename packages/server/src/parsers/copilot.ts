@@ -22,6 +22,26 @@ const CHARS_PER_TOKEN = 3;
 const DEFAULT_SYSTEM_TOKENS = 9278;
 const DEFAULT_TOOL_DEFS_TOKENS = 7325;
 
+function getPatchedTokenUsage(event: CopilotEvent): { input: number; output: number; cacheRead: number } | null {
+  const patchedData = event.data as typeof event.data & {
+    input_tokens?: number;
+    output_tokens?: number;
+    cache_read_tokens?: number;
+  };
+  const input = patchedData.input_tokens;
+  const output = patchedData.output_tokens;
+
+  if (typeof input !== 'number' || typeof output !== 'number') {
+    return null;
+  }
+
+  return {
+    input,
+    output,
+    cacheRead: typeof patchedData.cache_read_tokens === 'number' ? patchedData.cache_read_tokens : 0,
+  };
+}
+
 export function parseCopilotSessionFile(filePath: string): SessionDetail | null {
   try {
     const content = readFileSync(filePath, 'utf-8');
@@ -127,9 +147,12 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
       if (event.type === 'subagent.completed' && event.data.toolCallId) {
         const agent = subAgentMap.get(event.data.toolCallId);
         if (agent) {
+          const patchedTokens = getPatchedTokenUsage(event);
           agent.status = 'completed';
           agent.model = event.data.model;
-          agent.totalTokens = event.data.totalTokens;
+          agent.totalTokens = patchedTokens
+            ? patchedTokens.input + patchedTokens.output
+            : event.data.totalTokens;
           agent.totalToolCalls = event.data.totalToolCalls;
           agent.durationMs = event.data.durationMs;
           agent.endTime = event.timestamp;
@@ -164,7 +187,18 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
     }
 
     // ---------------------------------------------------------------
-    // Second pass: build messages + estimate token usage
+    // Detect patched-token mode: if any assistant.message carries
+    // input_tokens + output_tokens, the whole session uses exact values
+    // and we never fall back to estimation.
+    // ---------------------------------------------------------------
+    const hasPatchedTokens = events.some(e => {
+      if (e.type !== 'assistant.message') return false;
+      const d = e.data as typeof e.data & { input_tokens?: unknown; output_tokens?: unknown };
+      return typeof d.input_tokens === 'number' && typeof d.output_tokens === 'number';
+    });
+
+    // ---------------------------------------------------------------
+    // Second pass: build messages + token usage
     // ---------------------------------------------------------------
     const messages: Message[] = [];
 
@@ -176,31 +210,27 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
     let totalOutput = 0;
     let totalCost = 0;
 
-    // Running estimate of conversation context in characters.
-    // Resets when a session.compaction_complete event is detected.
+    // Estimation-mode only: running conversation context in characters.
     let conversationChars = 0;
     // Current system prompt char count (overwritten by each system.message event)
     let activeSystemChars = 0;
-    // The input token count from the previous assistant turn — used to estimate
-    // cache hits.  Claude caches the full prefix, so previous turn's context ≈
-    // what is served from cache in the current turn.
+    // Previous turn's input token count — used to estimate cache hits.
     let prevInputTokens = 0;
     let totalCacheRead = 0;
 
     for (const event of events) {
-      // Track system prompt changes
+      // Track system prompt changes (estimation mode only, but harmless to always run)
       if (event.type === 'system.message' && event.data.content) {
         activeSystemChars = event.data.content.length;
         continue;
       }
 
-      // After successful compaction the conversation history is reset;
-      // start the context accumulator fresh.
+      // After successful compaction the conversation history is reset.
       if (event.type === 'session.compaction_complete' && event.data.success) {
-        conversationChars = (event.data.summaryContent as string | undefined ?? '').length;
-        // After compaction the new context is a clean summary, so the
-        // previous cache entry no longer applies.
-        prevInputTokens = 0;
+        if (!hasPatchedTokens) {
+          conversationChars = (event.data.summaryContent as string | undefined ?? '').length;
+          prevInputTokens = 0;
+        }
         continue;
       }
 
@@ -213,7 +243,9 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
           content: userContent,
           timestamp: event.timestamp,
         });
-        conversationChars += userContent.length;
+        if (!hasPatchedTokens) {
+          conversationChars += userContent.length;
+        }
 
       } else if (event.type === 'assistant.message') {
         const toolCalls: ToolCall[] = (event.data.toolRequests || []).map(tr => ({
@@ -221,77 +253,202 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
           name: tr.name,
           arguments: tr.arguments,
         }));
-
         const msgContent = event.data.reasoningText || '';
 
-        // ---------- Token estimation ----------
-        // Model: Copilot caches the system prompt + tool definitions on every call
-        // after the first.  The "new" (non-cached) input is therefore just the
-        // growing conversation context.
-        const sysTokens = activeSystemChars > 0
-          ? Math.round(activeSystemChars / CHARS_PER_TOKEN)
-          : systemOverheadTokens;
+        // ── Route subagent-owned messages to that agent's message log ──
+        if (event.agentId && subAgentMap.has(event.agentId)) {
+          const agent = subAgentMap.get(event.agentId)!;
+          if (!agent.messages) agent.messages = [];
+          agent.messages.push({
+            id: event.id,
+            parentId: event.parentId,
+            role: 'assistant',
+            content: msgContent,
+            timestamp: event.timestamp,
+            model: event.data.model || model,
+            toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+            // Capture output-only token count available on subagent turns
+            tokens: event.data.outputTokens != null ? {
+              input: 0,
+              output: event.data.outputTokens,
+              estimated: true,
+            } : undefined,
+          });
 
-        // New (non-cached) input = conversation accumulated so far
-        const estInputTokens = Math.round(conversationChars / CHARS_PER_TOKEN);
+        } else if (hasPatchedTokens) {
+          // ── Main agent — Patched mode ─────────────────────────────────
+          // Only attribute tokens to main-agent turns: those that carry
+          // both data.turnId and exact patched token fields.
+          const patchedTokens = getPatchedTokenUsage(event);
+          const isMainTurn = event.data.turnId != null && patchedTokens != null;
 
-        // Cache = system + tool-definitions overhead (fixed per-call, always cached
-        // after the first round-trip; treat first call as 0 for accuracy).
-        const estCacheRead = prevInputTokens === 0 ? 0 : (sysTokens + toolDefsOverhead);
+          let msgTokens: Message['tokens'] | undefined;
+          if (isMainTurn && patchedTokens) {
+            const msgCost = calculateCost(
+              { input: patchedTokens.input, output: patchedTokens.output, cacheRead: patchedTokens.cacheRead },
+              model
+            );
+            msgTokens = {
+              input: patchedTokens.input,
+              output: patchedTokens.output,
+              cacheRead: patchedTokens.cacheRead,
+              estimated: false,
+              cost: msgCost,
+            };
+            inputPerMessage.push(patchedTokens.input);
+            outputPerMessage.push(patchedTokens.output);
+            totalInput += patchedTokens.input;
+            totalOutput += patchedTokens.output;
+            totalCacheRead += patchedTokens.cacheRead;
+            totalCost += msgCost;
+            cumulativeTokens.push(totalInput + totalOutput);
+          }
 
-        const exactOutputTokens = event.data.outputTokens ?? 0;
-        const msgCost = calculateCost(
-          { input: estInputTokens, output: exactOutputTokens, cacheRead: estCacheRead },
-          model
-        );
+          messages.push({
+            id: event.id,
+            parentId: event.parentId,
+            role: 'assistant',
+            content: msgContent,
+            timestamp: event.timestamp,
+            model,
+            toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+            tokens: msgTokens,
+          });
 
-        inputPerMessage.push(estInputTokens);
-        outputPerMessage.push(exactOutputTokens);
-        totalInput += estInputTokens;
-        totalOutput += exactOutputTokens;
-        totalCacheRead += estCacheRead;
-        totalCost += msgCost;
-        cumulativeTokens.push(totalInput + totalOutput);
+        } else {
+          // ── Main agent — Estimation mode ─────────────────────────────
+          // Copilot caches the system prompt + tool definitions on every
+          // call after the first.  The non-cached input is the growing
+          // conversation context.
+          const sysTokens = activeSystemChars > 0
+            ? Math.round(activeSystemChars / CHARS_PER_TOKEN)
+            : systemOverheadTokens;
 
-        // After this API call the assistant response is added to context
-        conversationChars += msgContent.length;
-        if (event.data.toolRequests && event.data.toolRequests.length > 0) {
-          conversationChars += JSON.stringify(event.data.toolRequests).length;
+          const estInputTokens = Math.round(conversationChars / CHARS_PER_TOKEN);
+          const estCacheRead = prevInputTokens === 0 ? 0 : (sysTokens + toolDefsOverhead);
+          const exactOutputTokens = event.data.outputTokens ?? 0;
+
+          const msgCost = calculateCost(
+            { input: estInputTokens, output: exactOutputTokens, cacheRead: estCacheRead },
+            model
+          );
+
+          inputPerMessage.push(estInputTokens);
+          outputPerMessage.push(exactOutputTokens);
+          totalInput += estInputTokens;
+          totalOutput += exactOutputTokens;
+          totalCacheRead += estCacheRead;
+          totalCost += msgCost;
+          cumulativeTokens.push(totalInput + totalOutput);
+
+          // After this API call the assistant response is added to context
+          conversationChars += msgContent.length;
+          if (event.data.toolRequests && event.data.toolRequests.length > 0) {
+            conversationChars += JSON.stringify(event.data.toolRequests).length;
+          }
+          // Mark that at least one turn has been seen (so subsequent turns use cache estimate)
+          prevInputTokens = estInputTokens + estCacheRead;
+
+          messages.push({
+            id: event.id,
+            parentId: event.parentId,
+            role: 'assistant',
+            content: msgContent,
+            timestamp: event.timestamp,
+            model,
+            toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+            tokens: {
+              input: estInputTokens,
+              output: exactOutputTokens,
+              cacheRead: estCacheRead,
+              estimated: true,
+              cost: msgCost,
+            },
+          });
         }
-        // Mark that at least one turn has been seen (so subsequent turns use cache estimate)
-        prevInputTokens = estInputTokens + estCacheRead; // full context for next-turn reference
-
-        messages.push({
-          id: event.id,
-          parentId: event.parentId,
-          role: 'assistant',
-          content: msgContent,
-          timestamp: event.timestamp,
-          model,
-          toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-          tokens: {
-            input: estInputTokens,
-            output: exactOutputTokens,
-            cacheRead: estCacheRead,
-            estimated: true,
-            cost: msgCost,
-          },
-        });
 
       } else if (event.type === 'tool.execution_complete') {
         const result = toolResultsById.get(event.data.toolCallId || '');
         if (result) {
-          messages.push({
-            id: event.id,
-            parentId: event.parentId,
-            role: 'tool',
-            content: result.content,
-            timestamp: event.timestamp,
-            toolResult: result,
-          });
-          // Tool results are sent back to the model in the next request
-          conversationChars += result.content.length;
+          if (event.agentId && subAgentMap.has(event.agentId)) {
+            // ── Route tool result to subagent's message log ────────────
+            const agent = subAgentMap.get(event.agentId)!;
+            if (!agent.messages) agent.messages = [];
+            agent.messages.push({
+              id: event.id,
+              parentId: event.parentId,
+              role: 'tool',
+              content: result.content,
+              timestamp: event.timestamp,
+              toolResult: result,
+            });
+          } else {
+            // ── Main agent tool result ─────────────────────────────────
+            messages.push({
+              id: event.id,
+              parentId: event.parentId,
+              role: 'tool',
+              content: result.content,
+              timestamp: event.timestamp,
+              toolResult: result,
+            });
+            // Tool results are sent back to the model in the next request (estimation mode only)
+            if (!hasPatchedTokens) {
+              conversationChars += result.content.length;
+            }
+          }
         }
+
+      } else if (event.type === 'subagent.completed') {
+        // ── Add subagent completion summary to main timeline ──────────
+        const refId = event.agentId || event.data.toolCallId;
+        const agent = refId ? subAgentMap.get(refId) : undefined;
+        const agentLabel = agent?.agentDisplayName || agent?.agentId || refId || 'Subagent';
+
+        let summary = `Subagent "${agentLabel}" completed`;
+        if (event.data.totalToolCalls) summary += ` · ${event.data.totalToolCalls} tool call(s)`;
+        if (event.data.durationMs) summary += ` · ${Math.round(event.data.durationMs / 1000)}s`;
+
+        const patchedTokens = getPatchedTokenUsage(event);
+        let completionTokens: Message['tokens'] | undefined;
+        if (patchedTokens) {
+          const cost = calculateCost(
+            { input: patchedTokens.input, output: patchedTokens.output, cacheRead: patchedTokens.cacheRead },
+            model
+          );
+          completionTokens = {
+            input: patchedTokens.input,
+            output: patchedTokens.output,
+            cacheRead: patchedTokens.cacheRead,
+            estimated: false,
+            cost,
+          };
+          // Accumulate subagent tokens into session-level totals
+          inputPerMessage.push(patchedTokens.input);
+          outputPerMessage.push(patchedTokens.output);
+          totalInput += patchedTokens.input;
+          totalOutput += patchedTokens.output;
+          totalCacheRead += patchedTokens.cacheRead;
+          totalCost += cost;
+          cumulativeTokens.push(totalInput + totalOutput);
+        } else if (event.data.totalTokens) {
+          completionTokens = {
+            input: event.data.totalTokens,
+            output: 0,
+            estimated: true,
+          };
+        }
+
+        messages.push({
+          id: event.id,
+          parentId: event.parentId,
+          role: 'system',
+          content: summary,
+          timestamp: event.timestamp,
+          subAgentRef: refId,
+          tokens: completionTokens,
+        });
+
       } else if (event.type === 'session.error') {
         messages.push({
           id: event.id,
@@ -299,6 +456,36 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
           role: 'system',
           content: `Error: ${event.data.errorType || 'Unknown'} - ${event.data.message || ''}`,
           timestamp: event.timestamp,
+        });
+      }
+    }
+
+    // ---------------------------------------------------------------
+    // Enrich each subagent's message log with synthetic prompt / result
+    // messages so the subagent Timeline looks like a mini-session.
+    // ---------------------------------------------------------------
+    for (const agent of subAgentMap.values()) {
+      if (!agent.messages) agent.messages = [];
+
+      // Prepend the task prompt as a synthetic user message
+      if (agent.prompt) {
+        agent.messages.unshift({
+          id: `${agent.id}-prompt`,
+          parentId: null,
+          role: 'user',
+          content: agent.prompt,
+          timestamp: agent.startTime,
+        });
+      }
+
+      // Append the final result as a synthetic system message
+      if (agent.result) {
+        agent.messages.push({
+          id: `${agent.id}-result`,
+          parentId: null,
+          role: 'system',
+          content: agent.result,
+          timestamp: agent.endTime ?? agent.startTime,
         });
       }
     }

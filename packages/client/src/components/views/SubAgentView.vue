@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { SubAgent } from '@/types'
+import { computed, ref } from 'vue'
+import type { SubAgent, SessionDetail } from '@/types'
 import { formatDuration, formatTokens } from '@/utils/formatters'
+import TimelineView from '@/components/views/TimelineView.vue'
+import TreeView from '@/components/views/TreeView.vue'
+import ChartsView from '@/components/views/ChartsView.vue'
+import RawView from '@/components/views/RawView.vue'
 
 const props = defineProps<{
   agent: SubAgent
@@ -12,126 +16,72 @@ const emit = defineEmits<{
   back: []
 }>()
 
-const renderedResult = computed(() => {
-  if (!props.agent?.result) return ''
-  return renderMarkdown(props.agent.result)
+type TabId = 'timeline' | 'tree' | 'charts' | 'raw'
+
+const tabs: { id: TabId; label: string; icon: string }[] = [
+  { id: 'timeline', label: 'Timeline', icon: 'M4 6h16M4 12h16M4 18h16' },
+  { id: 'tree',     label: 'Tree',     icon: 'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z' },
+  { id: 'charts',   label: 'Charts',   icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+  { id: 'raw',      label: 'Raw',      icon: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4' },
+]
+
+const activeTab = ref<TabId>('timeline')
+
+/**
+ * Wrap the subagent's data into a minimal SessionDetail so Charts / Raw
+ * views (which expect a full session) work out of the box.
+ */
+const subAgentSession = computed((): SessionDetail => {
+  const msgs = props.agent.messages ?? []
+  const assistantMsgs = msgs.filter(m => m.role === 'assistant' && m.tokens)
+
+  const inputPerMessage = assistantMsgs.map(m => m.tokens!.input)
+  const outputPerMessage = assistantMsgs.map(m => m.tokens!.output)
+  const totalInput = inputPerMessage.reduce((a, b) => a + b, 0)
+  const totalOutput = outputPerMessage.reduce((a, b) => a + b, 0)
+
+  let cumulative = 0
+  const cumulativeTokens = assistantMsgs.map(m => {
+    cumulative += m.tokens!.input + m.tokens!.output
+    return cumulative
+  })
+
+  return {
+    id: props.agent.id,
+    source: 'copilot',
+    project: props.agent.agentDisplayName || props.agent.agentId,
+    projectPath: '',
+    startTime: props.agent.startTime,
+    lastActivity: props.agent.endTime ?? props.agent.startTime,
+    messageCount: msgs.length,
+    totalTokens: props.agent.totalTokens,
+    model: props.agent.model,
+    messages: msgs,
+    stats: {
+      messageCount: msgs.length,
+      userMessages: msgs.filter(m => m.role === 'user').length,
+      assistantMessages: msgs.filter(m => m.role === 'assistant').length,
+      duration: props.agent.durationMs ?? 0,
+      tokens: assistantMsgs.length > 0 ? {
+        totalInput,
+        totalOutput,
+        totalCacheRead: 0,
+        totalCacheCreation: 0,
+        totalCost: 0,
+        inputPerMessage,
+        outputPerMessage,
+        cumulativeTokens,
+      } : undefined,
+      tools: [],
+    },
+    toolUsage: [],
+    subAgents: undefined,
+  }
 })
 
 function durationFormatted(ms?: number) {
   if (!ms) return ''
   return formatDuration(ms)
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;')
-}
-
-function formatInline(text: string): string {
-  return text
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-}
-
-function renderMarkdown(content: string): string {
-  const escaped = escapeHtml(content).replace(/\r\n/g, '\n')
-  const codeBlocks: string[] = []
-  const withPlaceholders = escaped.replace(/```([\w-]+)?\n([\s\S]*?)```/g, (_match, _language, code) => {
-    const codeHtml = `<pre><code>${code.trimEnd()}</code></pre>`
-    const index = codeBlocks.push(codeHtml) - 1
-    return `@@CODEBLOCK_${index}@@`
-  })
-
-  const htmlParts: string[] = []
-  const lines = withPlaceholders.split('\n')
-  const paragraph: string[] = []
-  let listType: 'ul' | 'ol' | null = null
-
-  const flushParagraph = () => {
-    if (paragraph.length === 0) return
-    htmlParts.push(`<p>${formatInline(paragraph.join('<br />'))}</p>`)
-    paragraph.length = 0
-  }
-
-  const closeList = () => {
-    if (!listType) return
-    htmlParts.push(`</${listType}>`)
-    listType = null
-  }
-
-  for (const rawLine of lines) {
-    const line = rawLine.trimEnd()
-    const trimmed = line.trim()
-
-    if (!trimmed) {
-      flushParagraph()
-      closeList()
-      continue
-    }
-
-    const codeBlockMatch = trimmed.match(/^@@CODEBLOCK_(\d+)@@$/)
-    if (codeBlockMatch) {
-      flushParagraph()
-      closeList()
-      htmlParts.push(codeBlocks[Number(codeBlockMatch[1])] ?? '')
-      continue
-    }
-
-    const headingMatch = trimmed.match(/^(#{1,3})\s+(.*)$/)
-    if (headingMatch) {
-      flushParagraph()
-      closeList()
-      const level = headingMatch[1].length
-      htmlParts.push(`<h${level}>${formatInline(headingMatch[2])}</h${level}>`)
-      continue
-    }
-
-    const quoteMatch = trimmed.match(/^>\s?(.*)$/)
-    if (quoteMatch) {
-      flushParagraph()
-      closeList()
-      htmlParts.push(`<blockquote>${formatInline(quoteMatch[1])}</blockquote>`)
-      continue
-    }
-
-    const unorderedListMatch = trimmed.match(/^[-*]\s+(.*)$/)
-    if (unorderedListMatch) {
-      flushParagraph()
-      if (listType !== 'ul') {
-        closeList()
-        htmlParts.push('<ul>')
-        listType = 'ul'
-      }
-      htmlParts.push(`<li>${formatInline(unorderedListMatch[1])}</li>`)
-      continue
-    }
-
-    const orderedListMatch = trimmed.match(/^\d+\.\s+(.*)$/)
-    if (orderedListMatch) {
-      flushParagraph()
-      if (listType !== 'ol') {
-        closeList()
-        htmlParts.push('<ol>')
-        listType = 'ol'
-      }
-      htmlParts.push(`<li>${formatInline(orderedListMatch[1])}</li>`)
-      continue
-    }
-
-    closeList()
-    paragraph.push(trimmed)
-  }
-
-  flushParagraph()
-  closeList()
-
-  return htmlParts.join('\n')
 }
 </script>
 
@@ -187,33 +137,58 @@ function renderMarkdown(content: string): string {
           <span class="text-muted">Duration:</span>
           <span class="font-medium">{{ durationFormatted(agent.durationMs) }}</span>
         </div>
+        <div v-if="agent.messages?.length" class="flex items-center gap-1">
+          <span class="text-muted">Messages:</span>
+          <span class="font-medium">{{ agent.messages.length }}</span>
+        </div>
       </div>
     </div>
 
-    <!-- Content -->
-    <div class="flex-1 overflow-y-auto p-4 space-y-4">
-      <!-- Prompt -->
-      <div v-if="agent.prompt" class="bg-primary rounded-lg border border-default overflow-hidden">
-        <details open>
-          <summary class="px-4 py-3 text-sm font-semibold text-primary cursor-pointer select-none hover:bg-tertiary">
-            Prompt
-          </summary>
-          <pre class="px-4 pb-4 text-xs text-secondary whitespace-pre-wrap font-sans leading-relaxed overflow-auto">{{ agent.prompt }}</pre>
-        </details>
-      </div>
+    <!-- Tab bar -->
+    <div class="bg-primary border-b border-default px-4">
+      <nav class="flex gap-1">
+        <button
+          v-for="tab in tabs"
+          :key="tab.id"
+          @click="activeTab = tab.id"
+          :class="[
+            'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+            activeTab === tab.id
+              ? 'text-accent border-accent'
+              : 'text-secondary border-transparent hover:text-primary hover:border-gray-300',
+          ]"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="tab.icon" />
+          </svg>
+          {{ tab.label }}
+        </button>
+      </nav>
+    </div>
 
-      <!-- Result -->
-      <div v-if="agent.result" class="bg-primary rounded-lg border border-default overflow-hidden">
-        <div class="px-4 py-3 border-b border-default">
-          <p class="text-sm font-semibold text-primary">Result</p>
-        </div>
-        <div class="p-4 markdown-content overflow-auto" v-html="renderedResult" />
-      </div>
+    <!-- Tab content -->
+    <div class="flex-1 overflow-y-auto p-4">
 
-      <!-- No content -->
-      <div v-if="!agent.prompt && !agent.result" class="text-sm text-muted italic p-4">
-        No content available for this subagent.
-      </div>
+      <!-- Timeline tab -->
+      <template v-if="activeTab === 'timeline'">
+        <TimelineView :messages="agent.messages" />
+      </template>
+
+      <!-- Tree tab -->
+      <template v-else-if="activeTab === 'tree'">
+        <TreeView :messages="agent.messages" />
+      </template>
+
+      <!-- Charts tab -->
+      <template v-else-if="activeTab === 'charts'">
+        <ChartsView :session="subAgentSession" />
+      </template>
+
+      <!-- Raw tab -->
+      <template v-else-if="activeTab === 'raw'">
+        <RawView :session="subAgentSession" />
+      </template>
+
     </div>
   </div>
 </template>

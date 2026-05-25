@@ -2,13 +2,18 @@
 import { ref, computed } from 'vue'
 import { useSessionsStore } from '@/stores/sessions'
 import type { SessionDetail, Message } from '@/types'
+import { formatTokens } from '@/utils/formatters'
 
 const props = defineProps<{
-  session: SessionDetail
+  session?: SessionDetail
+  /** Override the message list (used when showing subagent message logs). */
+  messages?: Message[]
 }>()
 
 const sessionsStore = useSessionsStore()
 const expandedNodes = ref<Set<string>>(new Set())
+
+const displayMessages = computed(() => props.messages ?? props.session?.messages ?? [])
 
 interface TreeNode {
   message: Message
@@ -18,7 +23,7 @@ interface TreeNode {
 
 // Build tree structure from messages
 const messageTree = computed(() => {
-  const messages = props.session.messages
+  const messages = displayMessages.value
   const nodeMap = new Map<string, TreeNode>()
   const roots: TreeNode[] = []
 
@@ -81,7 +86,7 @@ function hasChildren(node: TreeNode): boolean {
 }
 
 function expandAll() {
-  for (const message of props.session.messages) {
+  for (const message of displayMessages.value) {
     expandedNodes.value.add(message.id)
   }
 }
@@ -163,6 +168,16 @@ function getRoleColor(role: string): string {
                 {{ node.message.role }}
               </span>
               <span class="text-xs text-muted">{{ node.message.id.substring(0, 8) }}...</span>
+              <!-- Token badge -->
+              <span
+                v-if="node.message.tokens"
+                class="text-xs px-1.5 py-0.5 bg-secondary rounded"
+                :title="node.message.tokens.estimated
+                  ? `~Output: ${node.message.tokens.output.toLocaleString()} tokens`
+                  : `Input: ${node.message.tokens.input.toLocaleString()}, Output: ${node.message.tokens.output.toLocaleString()}`"
+              >
+                <span v-if="node.message.tokens.estimated" class="text-amber-500">~</span>{{ formatTokens(node.message.tokens.input + node.message.tokens.output) }}
+              </span>
               <span v-if="node.message.toolCalls && node.message.toolCalls.length > 0" class="text-xs text-yellow-600 dark:text-yellow-400">
                 {{ node.message.toolCalls.length }} tool call(s)
               </span>

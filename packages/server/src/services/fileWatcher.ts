@@ -20,13 +20,17 @@ export function initFileWatcher(broadcast: BroadcastFn): void {
 
   console.log('Initializing file watcher for:', watchPaths);
 
+  // Use stat-based polling so the watcher never opens or locks any watched
+  // file.  On Windows, chokidar's default fs.watch / awaitWriteFinish mode
+  // holds file handles that block other processes (e.g. Copilot) from
+  // appending to events.jsonl.  Polling uses fs.stat only — no file open,
+  // no lock.
   watcher = chokidar.watch(watchPaths, {
     persistent: true,
     ignoreInitial: true,
-    awaitWriteFinish: {
-      stabilityThreshold: config.watchDebounceMs,
-      pollInterval: 100,
-    },
+    usePolling: true,
+    interval: config.watchDebounceMs,
+    binaryInterval: config.watchDebounceMs,
   });
 
   watcher
