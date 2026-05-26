@@ -17,6 +17,10 @@ function getDefaultCodexPath(): string {
   return join(homedir(), '.codex', 'sessions');
 }
 
+function getDefaultOpenCodePath(): string {
+  return join(homedir(), '.local', 'share', 'opencode', 'storage');
+}
+
 function parsePathList(envValue: string | undefined, defaultPath: string): string[] {
   if (!envValue || envValue.trim() === '') {
     return [defaultPath];
@@ -33,6 +37,7 @@ export interface ServerConfig {
     claude: string[];
     copilot: string[];
     codex: string[];
+    opencode: string[];
   };
 }
 
@@ -46,6 +51,7 @@ export function getServerConfig(): ServerConfig {
       claude: parsePathList(process.env.CLAUDE_PATHS, getDefaultClaudePath()),
       copilot: parsePathList(process.env.COPILOT_PATHS, getDefaultCopilotPath()),
       codex: parsePathList(process.env.CODEX_PATHS, getDefaultCodexPath()),
+      opencode: parsePathList(process.env.OPENCODE_PATHS, getDefaultOpenCodePath()),
     },
   };
 }
@@ -55,6 +61,7 @@ let appConfig: AppConfig = {
     claude: getServerConfig().paths.claude,
     copilot: getServerConfig().paths.copilot,
     codex: getServerConfig().paths.codex,
+    opencode: getServerConfig().paths.opencode,
   },
   autoRefresh: true,
   refreshInterval: 5000,

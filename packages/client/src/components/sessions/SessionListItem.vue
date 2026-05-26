@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useSessionsStore } from '@/stores/sessions'
-import { formatRelativeTime, formatTokens, truncateText } from '@/utils/formatters'
+import { formatRelativeTime, formatTokens, truncateText, getSourceBgColor } from '@/utils/formatters'
 import type { SessionSummary } from '@/types'
 
 const props = defineProps<{
@@ -64,10 +64,7 @@ function cancelDelete() {
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
             <span
-              :class="[
-                'w-2 h-2 rounded-full flex-shrink-0',
-                session.source === 'claude' ? 'bg-orange-500' : session.source === 'codex' ? 'bg-blue-500' : 'bg-purple-500'
-              ]"
+              :class="['w-2 h-2 rounded-full flex-shrink-0', getSourceBgColor(session.source)]"
             />
             <span class="font-medium text-primary truncate">
               {{ truncateText(session.project, 30) }}

@@ -36,6 +36,7 @@ configRouter.get('/paths', (_req, res) => {
       claude: config.paths.claude,
       copilot: config.paths.copilot,
       codex: config.paths.codex,
+      opencode: config.paths.opencode,
     });
   } catch (error) {
     console.error('Error getting paths:', error);
@@ -52,11 +53,13 @@ configRouter.post('/paths/scan', (_req, res) => {
     const claudePaths = config.paths.claude.filter(p => existsSync(p));
     const copilotPaths = config.paths.copilot.filter(p => existsSync(p));
     const codexPaths = config.paths.codex.filter(p => existsSync(p));
+    const opencodePaths = config.paths.opencode.filter(p => existsSync(p));
 
     res.json({
       claude: claudePaths,
       copilot: copilotPaths,
       codex: codexPaths,
+      opencode: opencodePaths,
     });
   } catch (error) {
     console.error('Error scanning paths:', error);

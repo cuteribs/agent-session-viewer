@@ -6,7 +6,7 @@ export default defineConfig({
     format: ['esm'],
     platform: 'node',
     target: 'node20',
-    external: ['open'],
+    external: ['open', 'better-sqlite3'],
     clean: true,
     bundle: true,
     sourcemap: true,

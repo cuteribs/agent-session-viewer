@@ -15,11 +15,12 @@ const app = express();
 const server = createServer(app);
 
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { dirname, join, resolve } from 'path';
 import { existsSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const packageRoot = resolve(__dirname, '..');
 
 // WebSocket server
 const wss = new WebSocketServer({ server, path: '/ws' });
@@ -67,7 +68,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Serve static files if 'public' directory exists (production/standalone mode)
-const publicPath = join(__dirname, 'public');
+const publicPath = join(packageRoot, 'dist', 'public');
 if (existsSync(publicPath)) {
   console.log(`Serving static files from: ${publicPath}`);
   app.use(express.static(publicPath));
@@ -94,6 +95,8 @@ server.listen(config.port, config.host, async () => {
   console.log(`Watching paths:`);
   console.log(`  Claude: ${config.paths.claude.join(', ')}`);
   console.log(`  Copilot: ${config.paths.copilot.join(', ')}`);
+  console.log(`  Codex: ${config.paths.codex.join(', ')}`);
+  console.log(`  OpenCode: ${config.paths.opencode.join(', ')}`);
 
   // Open browser if built UI is available
   if (existsSync(publicPath)) {

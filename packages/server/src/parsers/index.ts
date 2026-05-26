@@ -1,9 +1,10 @@
 import { parseClaudeSessionFile, getClaudeSessionSummary } from './claude.js';
 import { parseCopilotSessionFile, getCopilotSessionSummary } from './copilot.js';
 import { parseCodexSessionFile, getCodexSessionSummary } from './codex.js';
+import { parseOpenCodeSessionFile, getOpenCodeSessionSummary, listOpenCodeDbSessionIds } from './opencode.js';
 import type { SessionDetail, SessionSummary } from '../types/index.js';
 
-export type SessionSource = 'claude' | 'copilot' | 'codex';
+export type SessionSource = 'claude' | 'copilot' | 'codex' | 'opencode';
 
 export function parseSessionFile(
   filePath: string,
@@ -16,6 +17,8 @@ export function parseSessionFile(
       return parseCopilotSessionFile(filePath);
     case 'codex':
       return parseCodexSessionFile(filePath);
+    case 'opencode':
+      return parseOpenCodeSessionFile(filePath);
     default:
       console.error(`Unknown session source: ${source}`);
       return null;
@@ -30,6 +33,8 @@ export function getSessionSummary(detail: SessionDetail): SessionSummary {
       return getCopilotSessionSummary(detail);
     case 'codex':
       return getCodexSessionSummary(detail);
+    case 'opencode':
+      return getOpenCodeSessionSummary(detail);
     default:
       return {
         id: detail.id,
@@ -45,5 +50,5 @@ export function getSessionSummary(detail: SessionDetail): SessionSummary {
   }
 }
 
-export { parseClaudeSessionFile, parseCopilotSessionFile, parseCodexSessionFile };
+export { parseClaudeSessionFile, parseCopilotSessionFile, parseCodexSessionFile, parseOpenCodeSessionFile, listOpenCodeDbSessionIds };
 

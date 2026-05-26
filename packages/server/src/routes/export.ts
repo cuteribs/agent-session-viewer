@@ -11,8 +11,8 @@ exportRouter.get('/:source/:sessionId', (req, res) => {
     const { source, sessionId } = req.params;
     const format = (req.query.format as string) || 'json';
 
-    if (source !== 'claude' && source !== 'copilot') {
-      res.status(400).json({ error: 'Bad request', message: 'Invalid source. Must be "claude" or "copilot"' });
+    if (source !== 'claude' && source !== 'copilot' && source !== 'codex' && source !== 'opencode') {
+      res.status(400).json({ error: 'Bad request', message: 'Invalid source. Must be "claude", "copilot", "codex", or "opencode"' });
       return;
     }
 
