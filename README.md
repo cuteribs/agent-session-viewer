@@ -9,8 +9,8 @@ A web application for analyzing and visualizing **Claude Code**, **Copilot CLI**
 ## Features
 
 -   **Multi-Agent Support**: View and analyze sessions from Claude Code, Copilot CLI, Codex, and OpenCode in a single interface.
--   **Subagent Drill-down**: Sessions that launched subagents (via the `task`/`Agent` tool) show an expandable subagent list in the sidebar. Click any subagent to open a full-page view showing its prompt, result, token stats, and tool call count.
--   **Token Usage & Cost**: Displays input/output/cache token counts per message and cumulative totals. Shows estimated USD cost per message and per session. Claude Code and Codex report exact token counts; Copilot sessions use a calibrated estimation model.
+-   **Subagent Drill-down**: Sessions that launched subagents (via the `task`/`Agent` tool) show an expandable subagent list in the sidebar. Click any subagent to open a full-page view with **four tabs** (Timeline, Tree, Charts, Raw) — the same as the parent session view.
+-   **Token Usage & Cost**: Displays input/output/cache token counts per message and cumulative totals. Shows estimated USD cost per message and per session. Claude Code, Codex, and OpenCode report exact token counts; Copilot sessions use a calibrated estimation model.
 -   **Conversation Timeline**: Clean timeline of the full conversation with tool call summaries grouped by name.
 -   **Charts View**: Visual breakdown of token usage over the session — input, output, and cache trends.
 -   **Tool Call Tracking**: Summarizes tool usage frequency and success rates per session.
@@ -37,7 +37,7 @@ By default, the tool looks for sessions in:
 -   Claude: `~/.claude/projects`
 -   Copilot: `~/.copilot/session-state`
 -   Codex: `~/.codex/sessions`
--   OpenCode: `~/.config/opencode/sessions`
+-   OpenCode: `~/.local/share/opencode/storage` (file mode) or `~/.local/share/opencode/opencode.db` (SQLite DB mode, auto-detected)
 
 You can override these paths or the port using environment variables. Copy `.env.example` to `.env` and adjust as needed:
 
@@ -47,7 +47,7 @@ You can override these paths or the port using environment variables. Copy `.env
 | `CLAUDE_PATHS` | `~/.claude/projects` | Comma-separated Claude session directories |
 | `COPILOT_PATHS` | `~/.copilot/session-state` | Comma-separated Copilot session directories |
 | `CODEX_PATHS` | `~/.codex/sessions` | Comma-separated Codex session directories |
-| `OPENCODE_PATHS` | `~/.config/opencode/sessions` | Comma-separated OpenCode session directories |
+| `OPENCODE_PATHS` | `~/.local/share/opencode/storage` | Comma-separated OpenCode session directories |
 | `WATCH_ENABLED` | `false` | Set to `true` to enable live file watching on startup |
 
 ## Supported Session Formats
@@ -68,7 +68,14 @@ Subagents launched via the `task` tool report aggregate stats (total tokens, too
 Sessions are stored as `.jsonl` files under `~/.codex/sessions/{year}/{month}/{day}/`. The format includes `session_meta` (metadata), `event_msg` (user and agent messages, token counts, task lifecycle), `response_item` (tool calls and outputs), and `turn_context` (model and configuration). Token usage is extracted from `token_count` events.
 
 ### OpenCode
-Sessions are stored as SQLite database files under `~/.config/opencode/sessions/`. The viewer reads session metadata, messages, and tool call parts directly from the database. Token usage and cost data are extracted per-message for detailed analysis.
+Sessions are stored in two formats, auto-detected by the viewer:
+
+- **SQLite DB** (default, current): `~/.local/share/opencode/opencode.db` — the viewer reads session, message, and part tables directly. This is the primary mode for recent OpenCode versions.
+- **JSON files** (legacy): `~/.local/share/opencode/storage/` — session metadata in `session/<project>/<id>.json`, per-message JSON in `message/<session_id>/`, and parts in `part/<message_id>/`.
+
+Token usage and cost data are extracted per-message for exact input/output/cache breakdowns. Cost is always recalculated from the pricing table (the DB stores `cost=0`).
+
+**Subagents:** OpenCode child sessions (`parent_id IS NOT NULL` in the DB) are treated as subagents of their parent session. They appear in the sidebar expand list and open as full subagent views with four tabs (Timeline, Tree, Charts, Raw). The parent session timeline includes synthetic summary entries showing each subagent's effective token usage and cost.
 
 ## Development
 

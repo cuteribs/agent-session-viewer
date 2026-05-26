@@ -9,8 +9,8 @@
 ## 功能特性
 
 -   **多 Agent 支持**：在同一界面中查看和分析来自 Claude Code、Copilot CLI、Codex 和 OpenCode 的会话。
--   **子 Agent 展开查看**：对于通过 `task`/`Agent` 工具启动了子 Agent 的会话，侧边栏会显示可展开的子 Agent 列表。点击任意子 Agent 可进入全页视图，展示其提示词、执行结果、Token 统计和工具调用次数。
--   **Token 用量与成本**：按消息和累计显示输入/输出/缓存 Token 数量，以及每条消息和整个会话的预估 USD 成本。Claude Code 和 Codex 使用精确 Token 数；Copilot 会话使用校准后的估算模型。
+-   **子 Agent 展开查看**：对于通过 `task`/`Agent` 工具启动了子 Agent 的会话，侧边栏会显示可展开的子 Agent 列表。点击任意子 Agent 可进入全页视图，包含与父会话相同的**四个标签页**（时间线、树形图、图表、原始数据）。
+-   **Token 用量与成本**：按消息和累计显示输入/输出/缓存 Token 数量，以及每条消息和整个会话的预估 USD 成本。Claude Code、Codex 和 OpenCode 使用精确 Token 数；Copilot 会话使用校准后的估算模型。
 -   **会话时间线**：以清晰的时间线展示完整对话历史，工具调用按名称分组汇总。
 -   **图表视图**：可视化展示会话中输入、输出和缓存 Token 的变化趋势。
 -   **工具调用统计**：汇总每个会话的工具使用频率和成功率。
@@ -37,7 +37,7 @@ npx @cuteribs/agent-session-viewer
 -   Claude：`~/.claude/projects`
 -   Copilot：`~/.copilot/session-state`
 -   Codex：`~/.codex/sessions`
--   OpenCode：`~/.config/opencode/sessions`
+-   OpenCode：`~/.local/share/opencode/storage`（文件模式）或 `~/.local/share/opencode/opencode.db`（SQLite DB 模式，自动检测）
 
 可通过环境变量覆盖上述路径或端口号。将 `.env.example` 复制为 `.env` 并按需修改：
 
@@ -47,7 +47,7 @@ npx @cuteribs/agent-session-viewer
 | `CLAUDE_PATHS` | `~/.claude/projects` | Claude 会话目录，多个路径用逗号分隔 |
 | `COPILOT_PATHS` | `~/.copilot/session-state` | Copilot 会话目录，多个路径用逗号分隔 |
 | `CODEX_PATHS` | `~/.codex/sessions` | Codex 会话目录，多个路径用逗号分隔 |
-| `OPENCODE_PATHS` | `~/.config/opencode/sessions` | OpenCode 会话目录，多个路径用逗号分隔 |
+| `OPENCODE_PATHS` | `~/.local/share/opencode/storage` | OpenCode 会话目录，多个路径用逗号分隔 |
 | `WATCH_ENABLED` | `false` | 设为 `true` 可在启动时开启实时文件监听 |
 
 ## 支持的会话格式
@@ -68,7 +68,14 @@ Copilot 的 Token 数量为**估算值**（会话日志中不包含精确的 API
 会话以 `.jsonl` 文件形式存储在 `~/.codex/sessions/{year}/{month}/{day}/` 下。格式包括：`session_meta`（元数据）、`event_msg`（用户和 Agent 消息、Token 统计、任务生命周期）、`response_item`（工具调用及输出）以及 `turn_context`（模型和配置信息）。Token 用量从 `token_count` 事件中提取。
 
 ### OpenCode
-会话以 SQLite 数据库文件形式存储在 `~/.config/opencode/sessions/` 下。查看器直接读取数据库中的会话元数据、消息和工具调用信息，并逐条提取 Token 用量和成本数据进行详细分析。
+会话以两种格式存储，查看器会自动检测：
+
+- **SQLite DB**（默认，当前版本）：`~/.local/share/opencode/opencode.db`——查看器直接读取 session、message 和 part 表。这是近期 OpenCode 版本的主要模式。
+- **JSON 文件**（历史模式）：`~/.local/share/opencode/storage/`——会话元数据存储在 `session/<project>/<id>.json`，消息存储在 `message/<session_id>/`，部件存储在 `part/<message_id>/`。
+
+每条消息均提取精确的输入/输出/缓存 Token 明细。成本始终根据定价表重新计算（DB 中存储的 cost 为 0）。
+
+**子 Agent**：OpenCode 的子会话（DB 中 `parent_id IS NOT NULL`）会被作为父会话的子 Agent 处理。它们出现在侧边栏的展开列表中，打开后显示包含四个标签页（时间线、树形图、图表、原始数据）的完整子 Agent 视图。父会话时间线会包含每个子 Agent 的汇总条目，展示其有效 Token 用量和成本。
 
 ## 开发指南
 

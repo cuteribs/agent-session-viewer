@@ -2,7 +2,7 @@
 
 ## Overview
 
-A web application for analyzing and visualizing AI agent sessions from **Claude Code**, **Copilot CLI**, and **Codex**. The app provides insights into token consumption, cost estimation, tool usage patterns, subagent activity, and conversation flow to help users understand and optimize their AI assistant interactions.
+A web application for analyzing and visualizing AI agent sessions from **Claude Code**, **Copilot CLI**, **Codex**, and **OpenCode**. The app provides insights into token consumption, cost estimation, tool usage patterns, subagent activity, and conversation flow to help users understand and optimize their AI assistant interactions.
 
 ## Architecture
 
@@ -25,10 +25,10 @@ A web application for analyzing and visualizing AI agent sessions from **Claude 
 │  │   API    │ │  File    │ │  Parser  │ │    WebSocket     │   │
 │  │  Routes  │ │  Watcher │ │  Engine  │ │    Server        │   │
 │  └──────────┘ └──────────┘ └──────────┘ └──────────────────┘   │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐                        │
-│  │  Claude  │ │ Copilot  │ │  Codex   │                        │
-│  │  Parser  │ │  Parser  │ │  Parser  │                        │
-│  └──────────┘ └──────────┘ └──────────┘                        │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────┐   │
+│  │  Claude  │ │ Copilot  │ │  Codex   │ │    OpenCode      │   │
+│  │  Parser  │ │  Parser  │ │  Parser  │ │    Parser        │   │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
                               │ File System
 ┌─────────────────────────────────────────────────────────────────┐
@@ -36,6 +36,8 @@ A web application for analyzing and visualizing AI agent sessions from **Claude 
 │  ~/.claude/projects/**/*.jsonl                                   │
 │  ~/.copilot/session-state/**/events.jsonl                        │
 │  ~/.codex/sessions/**/*.jsonl                                    │
+│  ~/.local/share/opencode/opencode.db  (SQLite, DB mode)          │
+│  ~/.local/share/opencode/storage/     (JSON files, legacy mode)  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -52,6 +54,7 @@ A web application for analyzing and visualizing AI agent sessions from **Claude 
 | Charts | Chart.js + vue-chartjs | Data visualization |
 | Build Tool | Vite | Frontend build and dev server |
 | File Watching | chokidar | Cross-platform file system watching |
+| SQLite | better-sqlite3 | OpenCode DB mode reading |
 
 ## Data Sources
 
@@ -234,6 +237,84 @@ interface CodexResponseItem {
 
 **Token accuracy:** Exact values from `token_count` events (cumulative session totals).
 
+### OpenCode Sessions
+
+OpenCode stores sessions in two formats, auto-detected by the parser:
+
+**DB Mode** (primary, for recent OpenCode versions):  
+`~/.local/share/opencode/opencode.db` (SQLite)
+
+Tables used:
+
+| Table | Key columns |
+|-------|------------|
+| `session` | `id`, `title`, `agent`, `directory`, `parent_id`, `model`, `time_created` |
+| `message` | `id`, `session_id`, `data` (JSON blob), `time_created` |
+| `part` | `id`, `message_id`, `data` (JSON blob), `time_created` |
+
+The `data` column in `message` contains an `OpenCodeMessage` JSON; `data` in `part` contains an `OpenCodePart` JSON. Token counts are read from `type=step-finish` parts (preferred) or the message-level `tokens` field.
+
+**Child sessions** (`parent_id IS NOT NULL`) are treated as subagents of their parent. `listOpenCodeDbSessionIds` returns only root sessions (`parent_id IS NULL`).
+
+**File Mode** (legacy):
+```
+~/.local/share/opencode/storage/
+  session/<project_id>/<session_id>.json   # OpenCodeSession
+  message/<session_id>/<message_id>.json   # OpenCodeMessage
+  part/<message_id>/<part_id>.json         # OpenCodePart
+```
+
+**Schema:**
+```typescript
+interface OpenCodeSession {
+  id: string;
+  projectID: string;
+  directory: string;
+  parentID?: string;      // set for child (subagent) sessions
+  title?: string;
+  agent?: string;         // agent type, e.g. "explore", "general"
+  time: { created: number; updated: number };
+}
+
+interface OpenCodeMessage {
+  id: string;
+  sessionID: string;
+  role: 'user' | 'assistant';
+  modelID?: string;
+  parentID?: string;
+  agent?: string;
+  time: { created: number; completed?: number };
+  tokens?: {
+    total: number;
+    input: number;
+    output: number;
+    reasoning?: number;
+    cache: { read: number; write: number };
+  };
+  cost?: number;  // stored as 0 in DB; always recalculated by the viewer
+}
+
+interface OpenCodePart {
+  id: string;
+  messageID: string;
+  type: 'text' | 'tool' | 'step-start' | 'step-finish' | 'reasoning';
+  text?: string;
+  tool?: string;       // tool name (type=tool)
+  callID?: string;
+  state?: { input?: unknown; output?: string; status: string };
+  tokens?: {           // type=step-finish only
+    input: number; output: number;
+    cache: { read: number; write: number };
+  };
+}
+```
+
+**Token accuracy:** Exact values from `step-finish` parts or message-level `tokens`. Cost is **always recalculated** from `pricing.ts` (the DB stores `cost=0`).
+
+**Input per message:** Computed as `input + cacheCreation` (effective tokens the model processed, including new cache writes). `cacheRead` is excluded from per-message input bars since those tokens are served from cache without reprocessing.
+
+**Subagents:** Child sessions are discovered via `SELECT * FROM session WHERE parent_id = ?` (DB mode) or by scanning `session/` JSON files for matching `parentID` (file mode). Each subagent is presented with full `messages[]`, Timeline / Tree / Charts / Raw tabs, and its token usage is rolled up into the parent session stats via synthetic `role:'system'` summary messages in the main timeline.
+
 ## API Endpoints
 
 ### Sessions API
@@ -268,7 +349,7 @@ PUT /api/config
   Response: AppConfig
 
 GET /api/config/paths
-  Response: { claude: string[], copilot: string[], codex: string[] }
+  Response: { claude: string[], copilot: string[], codex: string[], opencode: string[] }
 ```
 
 ### Watch (Live Update) API
@@ -298,7 +379,7 @@ GET /api/export/:source/:sessionId
 
 ```typescript
 interface SubAgent {
-  id: string;              // agentId (Copilot: toolCallId prefix; Claude: hex from filename)
+  id: string;              // agentId (Copilot: toolCallId prefix; Claude: hex from filename; OpenCode: child session id)
   agentId: string;         // human-readable name or same as id
   agentType: string;       // e.g. "general-purpose", "explore", "task"
   agentDisplayName: string; // title-cased display name
@@ -307,11 +388,12 @@ interface SubAgent {
   status: 'started' | 'completed' | 'failed';
   result?: string;         // final agent output (markdown)
   model?: string;
-  totalTokens?: number;
+  totalTokens?: number;    // input + output + cacheCreation (new context processed)
   totalToolCalls?: number;
   durationMs?: number;
   startTime: string;
   endTime?: string;
+  messages?: Message[];    // full message list for drill-down (Claude, OpenCode; absent for Copilot)
 }
 ```
 
@@ -320,7 +402,7 @@ interface SubAgent {
 ```typescript
 interface SessionSummary {
   id: string;
-  source: 'claude' | 'copilot' | 'codex';
+  source: 'claude' | 'copilot' | 'codex' | 'opencode';
   project: string;
   projectPath: string;
   startTime: string;
@@ -418,6 +500,7 @@ interface AppConfig {
     claude: string[];
     copilot: string[];
     codex: string[];
+    opencode: string[];
   };
   autoRefresh: boolean;
   refreshInterval: number;  // ms
@@ -432,7 +515,7 @@ interface AppConfig {
 interface WSMessage {
   type: 'session_updated' | 'session_created' | 'session_deleted' | 'watch_status';
   payload: {
-    source?: 'claude' | 'copilot' | 'codex';
+    source?: 'claude' | 'copilot' | 'codex' | 'opencode';
     sessionId?: string;
     data?: SessionSummary;
     active?: boolean;  // used by watch_status
@@ -453,7 +536,7 @@ interface WSMessage {
 │                  │                                              │
 │  [all][claude]   │  ┌──────────────────────────────────────┐   │
 │  [copilot][codex]│  │  Session Header (name, model, stats) │   │
-│                  │  ├──────────────────────────────────────┤   │
+│  [opencode]      │  ├──────────────────────────────────────┤   │
 │  [Date][Project] │  │  [Timeline][Charts][Tree][Raw]        │   │
 │                  │  ├──────────────────────────────────────┤   │
 │  Session list    │  │                                      │   │
@@ -502,9 +585,15 @@ Full-page view shown in `MainContent` when a subagent is selected from the sideb
 **Features:**
 - Breadcrumb header with back button (returns to session tabs)
 - Agent name, type badge, status badge
-- Stats bar: model · tokens · tool calls · duration
-- Collapsible prompt block (`<details>` element)
-- Markdown-rendered result block
+- Stats bar: model · tokens · tool calls · duration · message count
+- Four tabs identical to the parent session view:
+  - **Timeline** — full message list with token badges and tool call summaries
+  - **Tree** — conversation tree (parent/child message relationships)
+  - **Charts** — token usage bars, cumulative chart, tool usage chart + summary + details table
+  - **Raw** — JSON dump of the synthetic `SessionDetail` built from the subagent's messages
+- `subAgentSession` computed property builds `SessionDetail` from `agent.messages`:
+  - `inputPerMessage` = `tokens.input + tokens.cacheCreation` (effective new context per turn)
+  - `stats.tools` and `toolUsage` computed from all `message.toolCalls` in the subagent
 
 **Navigation:** Selecting a different session or clicking the back button calls `clearSubAgent()` in the Pinia store, returning to the normal session view.
 
@@ -540,6 +629,7 @@ Session and per-message USD costs are calculated using the pricing table in `pac
 - Claude: cost calculated from exact API usage fields
 - Copilot: cost calculated from estimated input + exact output + estimated cache
 - Codex: cost calculated from `token_count` event totals
+- OpenCode: cost always **recalculated** from `calculateCost()` (DB stores `cost=0`); cache write tokens for GPT-style models are merged into input at input rate
 
 Cost fields: `Message.tokens.cost` (per message), `SessionStats.tokens.totalCost` (session total).
 
@@ -562,10 +652,11 @@ agent-session-viewer/
     │       ├── config.ts         # Environment config
     │       ├── pricing.ts        # Token cost lookup table
     │       ├── parsers/
-    │       │   ├── index.ts      # Parser factory + source detection
-    │       │   ├── claude.ts     # Claude Code parser + subagent loader
-    │       │   ├── copilot.ts    # Copilot CLI parser + token estimation
-    │       │   └── codex.ts      # Codex parser
+│       │   ├── index.ts      # Parser factory + source detection
+│       │   ├── claude.ts     # Claude Code parser + subagent loader
+│       │   ├── copilot.ts    # Copilot CLI parser + token estimation
+│       │   ├── codex.ts      # Codex parser
+│       │   └── opencode.ts   # OpenCode parser (DB + file mode, subagents)
     │       ├── routes/
     │       │   ├── sessions.ts   # Session CRUD routes
     │       │   ├── config.ts     # App config routes
@@ -630,6 +721,7 @@ HOST=localhost
 CLAUDE_PATHS=
 COPILOT_PATHS=
 CODEX_PATHS=
+OPENCODE_PATHS=
 
 # File watching (disabled by default; enable at startup with =true)
 WATCH_ENABLED=false
@@ -642,11 +734,13 @@ WATCH_DEBOUNCE_MS=500
 - Claude: `%USERPROFILE%\.claude\projects\`
 - Copilot: `%USERPROFILE%\.copilot\session-state\`
 - Codex: `%USERPROFILE%\.codex\sessions\`
+- OpenCode: `%USERPROFILE%\.local\share\opencode\storage\`
 
 **macOS/Linux:**
 - Claude: `~/.claude/projects/`
 - Copilot: `~/.copilot/session-state/`
 - Codex: `~/.codex/sessions/`
+- OpenCode: `~/.local/share/opencode/storage/` (or auto-uses `opencode.db` if present)
 
 ## Charts Specification
 
