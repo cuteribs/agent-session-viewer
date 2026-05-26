@@ -35,20 +35,39 @@ const subAgentSession = computed((): SessionDetail => {
   const msgs = props.agent.messages ?? []
   const assistantMsgs = msgs.filter(m => m.role === 'assistant' && m.tokens)
 
-  const inputPerMessage = assistantMsgs.map(m => m.tokens!.input)
+  // Use effective input = raw input + cacheCreation (new context the model processed)
+  const inputPerMessage = assistantMsgs.map(m =>
+    (m.tokens!.input || 0) + (m.tokens!.cacheCreation || 0)
+  )
   const outputPerMessage = assistantMsgs.map(m => m.tokens!.output)
   const totalInput = inputPerMessage.reduce((a, b) => a + b, 0)
   const totalOutput = outputPerMessage.reduce((a, b) => a + b, 0)
+  const totalCacheRead = assistantMsgs.reduce((a, m) => a + (m.tokens!.cacheRead || 0), 0)
+  const totalCacheCreation = assistantMsgs.reduce((a, m) => a + (m.tokens!.cacheCreation || 0), 0)
+  const totalCost = assistantMsgs.reduce((a, m) => a + (m.tokens!.cost || 0), 0)
 
   let cumulative = 0
-  const cumulativeTokens = assistantMsgs.map(m => {
-    cumulative += m.tokens!.input + m.tokens!.output
+  const cumulativeTokens = inputPerMessage.map((inp, i) => {
+    cumulative += inp + (outputPerMessage[i] || 0)
     return cumulative
   })
 
+  // Build tool usage from message toolCalls
+  const toolUsageMap = new Map<string, number>()
+  for (const msg of msgs) {
+    if (msg.toolCalls) {
+      for (const tc of msg.toolCalls) {
+        toolUsageMap.set(tc.name, (toolUsageMap.get(tc.name) ?? 0) + 1)
+      }
+    }
+  }
+  const toolUsage = Array.from(toolUsageMap.entries()).map(([name, count]) => ({
+    name, count, successRate: 1,
+  }))
+
   return {
     id: props.agent.id,
-    source: 'copilot',
+    source: 'opencode',
     project: props.agent.agentDisplayName || props.agent.agentId,
     projectPath: '',
     startTime: props.agent.startTime,
@@ -65,16 +84,16 @@ const subAgentSession = computed((): SessionDetail => {
       tokens: assistantMsgs.length > 0 ? {
         totalInput,
         totalOutput,
-        totalCacheRead: 0,
-        totalCacheCreation: 0,
-        totalCost: 0,
+        totalCacheRead,
+        totalCacheCreation,
+        totalCost,
         inputPerMessage,
         outputPerMessage,
         cumulativeTokens,
       } : undefined,
-      tools: [],
+      tools: toolUsage,
     },
-    toolUsage: [],
+    toolUsage,
     subAgents: undefined,
   }
 })

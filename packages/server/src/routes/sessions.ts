@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { unlinkSync, existsSync, rmSync } from 'fs';
+import { existsSync, rmSync, unlinkSync } from 'fs';
 import { dirname, basename, join } from 'path';
 import {
   listSessions,
@@ -9,6 +9,7 @@ import {
   findSessionFiles,
   invalidateSession,
 } from '../services/sessionService.js';
+import { deleteOpenCodeSession } from '../parsers/opencode.js';
 import type { SessionSource } from '../parsers/index.js';
 
 export const sessionsRouter = Router();
@@ -114,7 +115,16 @@ sessionsRouter.delete('/:source/:sessionId', (req, res) => {
 
     // Delete the file and all related files/directories based on source
     try {
-      if (source === 'copilot') {
+      if (source === 'opencode') {
+        // OpenCode DB mode: `db::<sessionId>` — delete from SQLite (cascades to children/messages/parts)
+        // File mode: delete session JSON + associated message/part directories
+        const deleted = deleteOpenCodeSession(filePath);
+        if (!deleted) {
+          res.status(500).json({ error: 'Internal server error', message: 'Failed to delete OpenCode session' });
+          return;
+        }
+        console.log(`Deleted OpenCode session: ${sessionId}`);
+      } else if (source === 'copilot') {
         // Copilot: delete the entire session directory (<basePath>/<sessionId>/)
         const sessionDir = dirname(filePath);
         rmSync(sessionDir, { recursive: true, force: true });
