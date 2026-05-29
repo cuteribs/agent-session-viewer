@@ -219,6 +219,21 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
     let totalOutput = 0;
     let totalCost = 0;
 
+    // Accumulate exact output tokens from subagent assistant.message events
+    // (used when subagent.completed carries no token data)
+    const subAgentOutputMap = new Map<string, number>(); // agentId → summed outputTokens
+
+    // Per-subagent input estimation state (mirrors estimation-mode vars for main agent)
+    // Seeded with task prompt length so the first turn includes the initial context.
+    const subAgentConvChars = new Map<string, number>();
+    const subAgentPrevInputTokens = new Map<string, number>();
+    // Accumulated estimated input tokens and cost per subagent (for subagent.completed rollup)
+    const subAgentInputMap = new Map<string, number>();
+    const subAgentCostMap = new Map<string, number>();
+    for (const [id, agent] of subAgentMap) {
+      subAgentConvChars.set(id, (agent.prompt ?? '').length);
+    }
+
     // Estimation-mode only: running conversation context in characters.
     let conversationChars = 0;
     // Current system prompt char count (overwritten by each system.message event)
@@ -268,21 +283,54 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
         if (event.agentId && subAgentMap.has(event.agentId)) {
           const agent = subAgentMap.get(event.agentId)!;
           if (!agent.messages) agent.messages = [];
+          const subOutputTok = typeof event.data.outputTokens === 'number' ? event.data.outputTokens : 0;
+          const subMsgModel = event.data.model || model;
+          // Backfill agent.model from first message if not yet set
+          if (!agent.model && subMsgModel) {
+            agent.model = subMsgModel;
+          }
+
+          // ── Estimate subagent input from accumulated conversation context ──
+          // Uses the same chars-per-token ratio and cache heuristic as the main agent.
+          const agentConvChars = subAgentConvChars.get(event.agentId) ?? 0;
+          const prevSubIn = subAgentPrevInputTokens.get(event.agentId) ?? 0;
+          const estSubInput = Math.round(agentConvChars / CHARS_PER_TOKEN);
+          const estSubCacheRead = prevSubIn === 0 ? 0 : (systemOverheadTokens + toolDefsOverhead);
+          const subMsgCost = calculateCost(
+            { input: estSubInput, output: subOutputTok, cacheRead: estSubCacheRead },
+            subMsgModel
+          );
+          // Advance conversation context for next turn
+          const addedChars = msgContent.length +
+            (event.data.toolRequests && event.data.toolRequests.length > 0
+              ? JSON.stringify(event.data.toolRequests).length
+              : 0);
+          subAgentConvChars.set(event.agentId, agentConvChars + addedChars);
+          subAgentPrevInputTokens.set(event.agentId, estSubInput + estSubCacheRead);
+          // Accumulate per-subagent totals for subagent.completed rollup
+          subAgentInputMap.set(event.agentId, (subAgentInputMap.get(event.agentId) ?? 0) + estSubInput);
+          subAgentCostMap.set(event.agentId, (subAgentCostMap.get(event.agentId) ?? 0) + subMsgCost);
+
           agent.messages.push({
             id: event.id,
             parentId: event.parentId,
             role: 'assistant',
             content: msgContent,
             timestamp: event.timestamp,
-            model: event.data.model || model,
+            model: subMsgModel,
             toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-            // Capture output-only token count available on subagent turns
-            tokens: event.data.outputTokens != null ? {
-              input: 0,
-              output: event.data.outputTokens,
+            tokens: (estSubInput > 0 || subOutputTok > 0) ? {
+              input: estSubInput,
+              output: subOutputTok,
+              cacheRead: estSubCacheRead,
               estimated: true,
+              cost: subMsgCost,
             } : undefined,
           });
+          // Accumulate exact output tokens for this subagent across all its turns
+          if (subOutputTok > 0) {
+            subAgentOutputMap.set(event.agentId, (subAgentOutputMap.get(event.agentId) ?? 0) + subOutputTok);
+          }
 
         } else if (hasPatchedTokens) {
           // ── Main agent — Patched mode ─────────────────────────────────
@@ -391,6 +439,9 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
               timestamp: event.timestamp,
               toolResult: result,
             });
+            // Tool results are fed back to the subagent on the next turn — advance its context
+            const curConvChars = subAgentConvChars.get(event.agentId) ?? 0;
+            subAgentConvChars.set(event.agentId, curConvChars + result.content.length);
           } else {
             // ── Main agent tool result ─────────────────────────────────
             messages.push({
@@ -440,12 +491,47 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
           totalCacheRead += patchedTokens.cacheRead;
           totalCost += cost;
           cumulativeTokens.push(totalInput + totalOutput);
-        } else if (event.data.totalTokens) {
-          completionTokens = {
-            input: event.data.totalTokens,
-            output: 0,
-            estimated: true,
-          };
+          // Backfill agent.totalTokens if not yet set
+          if (agent && agent.totalTokens == null) {
+            agent.totalTokens = patchedTokens.input + patchedTokens.output;
+          }
+        } else {
+          // No snake_case patched tokens — use accumulated per-message values:
+          //   output  = exact sum from subagent assistant.message outputTokens
+          //   input   = estimated sum from per-turn context estimation
+          //   cost    = pre-summed per-message cost (accounts for cacheRead per turn)
+          const outTokens = subAgentOutputMap.get(refId ?? '') ?? 0;
+          const inTokens = subAgentInputMap.get(refId ?? '') ??
+            // Fallback: if estimation data missing, try to infer from event.data.totalTokens
+            (typeof event.data.totalTokens === 'number' && event.data.totalTokens > outTokens
+              ? event.data.totalTokens - outTokens
+              : 0);
+          const accumulatedCost = subAgentCostMap.get(refId ?? '') ?? 0;
+
+          if (outTokens > 0 || inTokens > 0) {
+            // Use pre-summed cost if available; otherwise fall back to a single calculateCost call
+            const subAgentModel = agent?.model || model;
+            const cost = accumulatedCost > 0
+              ? accumulatedCost
+              : calculateCost({ input: inTokens, output: outTokens }, subAgentModel);
+            completionTokens = {
+              input: inTokens,
+              output: outTokens,
+              estimated: true,
+              cost,
+            };
+            // Accumulate into session-level totals (always push both to keep arrays paired)
+            inputPerMessage.push(inTokens);
+            outputPerMessage.push(outTokens);
+            totalInput += inTokens;
+            totalOutput += outTokens;
+            totalCost += cost;
+            cumulativeTokens.push(totalInput + totalOutput);
+            // Backfill agent.totalTokens if not yet set
+            if (agent && agent.totalTokens == null) {
+              agent.totalTokens = inTokens + outTokens;
+            }
+          }
         }
 
         messages.push({
