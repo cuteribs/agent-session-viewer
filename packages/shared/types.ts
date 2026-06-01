@@ -354,6 +354,17 @@ export interface SessionSummary {
   totalTokens?: number;
   model?: string;
   subAgentCount?: number;
+  /** Per-model breakdown (populated from session.shutdown for copilot sessions). */
+  usedModels?: UsedModelEntry[];
+}
+
+export interface UsedModelEntry {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  requestCount: number;
+  cost: number;
 }
 
 export interface SessionDetail extends SessionSummary {

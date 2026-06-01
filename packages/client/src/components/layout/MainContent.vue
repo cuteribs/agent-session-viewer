@@ -106,7 +106,20 @@ function handleExport(format: 'csv' | 'json') {
             <span class="text-muted">Tokens:</span>
             <TokenBadge :tokens="session.totalTokens" />
           </div>
-          <div v-if="session.model" class="flex items-center gap-1">
+          <!-- Per-model breakdown (exact from session.shutdown) -->
+          <div v-if="session.usedModels?.length" class="flex items-center gap-3">
+            <span class="text-muted">Models:</span>
+            <span
+              v-for="m in session.usedModels"
+              :key="m.model"
+              class="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+              :title="`${m.requestCount} requests · Output: ${m.outputTokens.toLocaleString()} · Cost: ${formatCost(m.cost)}`"
+            >
+              {{ m.model }}
+              <TokenBadge :tokens="m.totalTokens" />
+            </span>
+          </div>
+          <div v-else-if="session.model" class="flex items-center gap-1">
             <span class="text-muted">Model:</span>
             <span class="font-medium">{{ session.model }}</span>
           </div>
@@ -121,11 +134,8 @@ function handleExport(format: 'csv' | 'json') {
           <!-- Session cost subtotal -->
           <div v-if="session.stats.tokens?.totalCost != null && session.stats.tokens.totalCost > 0" class="flex items-center gap-1">
             <span class="text-muted">Cost:</span>
-            <span
-              class="font-semibold text-green-700 dark:text-green-400"
-              :title="session.source === 'copilot' ? 'Estimated cost (input tokens estimated from conversation size)' : 'Cost based on exact token counts'"
-            >
-              <span v-if="session.source === 'copilot'" class="text-xs font-normal opacity-70">~</span>{{ formatCost(session.stats.tokens.totalCost) }}
+            <span class="font-semibold text-green-700 dark:text-green-400">
+              {{ formatCost(session.stats.tokens.totalCost) }}
             </span>
           </div>
         </div>

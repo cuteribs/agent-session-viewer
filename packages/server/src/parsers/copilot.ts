@@ -13,15 +13,6 @@ import type {
 } from '../types/index.js';
 import { calculateCost } from '../pricing.js';
 
-// Calibrated chars-per-token ratio for Copilot sessions.
-// Code/JSON-heavy content tokenises at ~3 chars/token (calibrated against
-// session.compaction_start.conversationTokens ground-truth data).
-const CHARS_PER_TOKEN = 3;
-
-// Default token overheads used when compaction_start events are absent
-const DEFAULT_SYSTEM_TOKENS = 9278;
-const DEFAULT_TOOL_DEFS_TOKENS = 7325;
-
 function getPatchedTokenUsage(event: CopilotEvent): { input: number; output: number; cacheRead: number } | null {
   const patchedData = event.data as typeof event.data & {
     input_tokens?: number;
@@ -75,16 +66,7 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
     let model: string | undefined = startEvent?.data.selectedModel;
 
     // ---------------------------------------------------------------
-    // Collect fixed overhead from the first session.compaction_start
-    // (systemTokens + toolDefinitionsTokens).  These are constant
-    // across all API calls in a session.
-    // ---------------------------------------------------------------
-    let systemOverheadTokens = DEFAULT_SYSTEM_TOKENS;
-    let toolDefsOverhead = DEFAULT_TOOL_DEFS_TOKENS;
-    let toolDefsSet = false;
-
-    // ---------------------------------------------------------------
-    // First pass: collect fixed overheads, tool results, model changes
+    // First pass: collect subagents, tool results, model changes
     // ---------------------------------------------------------------
     const toolUsageMap = new Map<string, { count: number; successes: number }>();
     const toolResultsById = new Map<string, ToolResult>();
@@ -94,13 +76,6 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
     const subAgentByName = new Map<string, SubAgent>();
 
     for (const event of events) {
-      if (event.type === 'session.compaction_start' && event.data.systemTokens && !toolDefsSet) {
-        // Use the server-reported values if available (most accurate)
-        systemOverheadTokens = event.data.systemTokens;
-        toolDefsOverhead = event.data.toolDefinitionsTokens ?? DEFAULT_TOOL_DEFS_TOKENS;
-        toolDefsSet = true;
-      }
-
       // Capture tool name from the start event (not available on complete event)
       if (event.type === 'tool.execution_start' && event.data.toolCallId && event.data.toolName) {
         toolNamesById.set(event.data.toolCallId, event.data.toolName);
@@ -207,7 +182,58 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
     });
 
     // ---------------------------------------------------------------
-    // Second pass: build messages + token usage
+    // Extract exact session-level totals from session.shutdown
+    // (always the last line in a completed session)
+    // ---------------------------------------------------------------
+    const rawLastLine = lines[lines.length - 1];
+    let shutdownData: Record<string, {
+      requests: { count: number; cost: number };
+      usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; reasoningTokens: number };
+    }> | null = null;
+    try {
+      const parsed = JSON.parse(rawLastLine);
+      if (parsed?.type === 'session.shutdown' && parsed?.data?.modelMetrics) {
+        shutdownData = parsed.data.modelMetrics;
+      }
+    } catch { /* not valid JSON — ignore */ }
+
+    let exactTotalInput = 0;
+    let exactTotalOutput = 0;
+    let exactTotalCacheRead = 0;
+    let exactTotalCacheCreation = 0;
+    let exactTotalCost = 0;
+
+    if (shutdownData) {
+      for (const modelName of Object.keys(shutdownData)) {
+        const m = shutdownData[modelName];
+        exactTotalInput += m.usage.inputTokens;
+        exactTotalOutput += m.usage.outputTokens;
+        exactTotalCacheRead += m.usage.cacheReadTokens;
+        exactTotalCacheCreation += m.usage.cacheWriteTokens;
+        exactTotalCost += calculateCost(
+          {
+            input: m.usage.inputTokens,
+            output: m.usage.outputTokens,
+            cacheRead: m.usage.cacheReadTokens,
+            cacheCreation: m.usage.cacheWriteTokens,
+          },
+          modelName
+        );
+      }
+    } else {
+      // Fallback: sum outputTokens from all assistant.message events when shutdown is absent
+      for (const line of lines) {
+        try {
+          const ev = JSON.parse(line);
+          if (ev?.type === 'assistant.message' && typeof ev?.data?.outputTokens === 'number') {
+            exactTotalOutput += ev.data.outputTokens;
+          }
+        } catch { /* skip */ }
+      }
+    }
+
+    // ---------------------------------------------------------------
+    // Second pass: build messages + per-message output tokens
     // ---------------------------------------------------------------
     const messages: Message[] = [];
 
@@ -215,49 +241,11 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
     const inputPerMessage: number[] = [];
     const outputPerMessage: number[] = [];
     const cumulativeTokens: number[] = [];
-    let totalInput = 0;
-    let totalOutput = 0;
-    let totalCost = 0;
 
     // Accumulate exact output tokens from subagent assistant.message events
-    // (used when subagent.completed carries no token data)
     const subAgentOutputMap = new Map<string, number>(); // agentId → summed outputTokens
 
-    // Per-subagent input estimation state (mirrors estimation-mode vars for main agent)
-    // Seeded with task prompt length so the first turn includes the initial context.
-    const subAgentConvChars = new Map<string, number>();
-    const subAgentPrevInputTokens = new Map<string, number>();
-    // Accumulated estimated input tokens and cost per subagent (for subagent.completed rollup)
-    const subAgentInputMap = new Map<string, number>();
-    const subAgentCostMap = new Map<string, number>();
-    for (const [id, agent] of subAgentMap) {
-      subAgentConvChars.set(id, (agent.prompt ?? '').length);
-    }
-
-    // Estimation-mode only: running conversation context in characters.
-    let conversationChars = 0;
-    // Current system prompt char count (overwritten by each system.message event)
-    let activeSystemChars = 0;
-    // Previous turn's input token count — used to estimate cache hits.
-    let prevInputTokens = 0;
-    let totalCacheRead = 0;
-
     for (const event of events) {
-      // Track system prompt changes (estimation mode only, but harmless to always run)
-      if (event.type === 'system.message' && event.data.content) {
-        activeSystemChars = event.data.content.length;
-        continue;
-      }
-
-      // After successful compaction the conversation history is reset.
-      if (event.type === 'session.compaction_complete' && event.data.success) {
-        if (!hasPatchedTokens) {
-          conversationChars = (event.data.summaryContent as string | undefined ?? '').length;
-          prevInputTokens = 0;
-        }
-        continue;
-      }
-
       if (event.type === 'user.message') {
         const userContent = event.data.content || event.data.transformedContent || '';
         messages.push({
@@ -267,9 +255,6 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
           content: userContent,
           timestamp: event.timestamp,
         });
-        if (!hasPatchedTokens) {
-          conversationChars += userContent.length;
-        }
 
       } else if (event.type === 'assistant.message') {
         const toolCalls: ToolCall[] = (event.data.toolRequests || []).map(tr => ({
@@ -290,27 +275,6 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
             agent.model = subMsgModel;
           }
 
-          // ── Estimate subagent input from accumulated conversation context ──
-          // Uses the same chars-per-token ratio and cache heuristic as the main agent.
-          const agentConvChars = subAgentConvChars.get(event.agentId) ?? 0;
-          const prevSubIn = subAgentPrevInputTokens.get(event.agentId) ?? 0;
-          const estSubInput = Math.round(agentConvChars / CHARS_PER_TOKEN);
-          const estSubCacheRead = prevSubIn === 0 ? 0 : (systemOverheadTokens + toolDefsOverhead);
-          const subMsgCost = calculateCost(
-            { input: estSubInput, output: subOutputTok, cacheRead: estSubCacheRead },
-            subMsgModel
-          );
-          // Advance conversation context for next turn
-          const addedChars = msgContent.length +
-            (event.data.toolRequests && event.data.toolRequests.length > 0
-              ? JSON.stringify(event.data.toolRequests).length
-              : 0);
-          subAgentConvChars.set(event.agentId, agentConvChars + addedChars);
-          subAgentPrevInputTokens.set(event.agentId, estSubInput + estSubCacheRead);
-          // Accumulate per-subagent totals for subagent.completed rollup
-          subAgentInputMap.set(event.agentId, (subAgentInputMap.get(event.agentId) ?? 0) + estSubInput);
-          subAgentCostMap.set(event.agentId, (subAgentCostMap.get(event.agentId) ?? 0) + subMsgCost);
-
           agent.messages.push({
             id: event.id,
             parentId: event.parentId,
@@ -319,12 +283,11 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
             timestamp: event.timestamp,
             model: subMsgModel,
             toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-            tokens: (estSubInput > 0 || subOutputTok > 0) ? {
-              input: estSubInput,
+            // Per-message output only (exact); cost can be derived by SubAgentView
+            tokens: subOutputTok > 0 ? {
+              input: 0,
               output: subOutputTok,
-              cacheRead: estSubCacheRead,
-              estimated: true,
-              cost: subMsgCost,
+              estimated: false,
             } : undefined,
           });
           // Accumulate exact output tokens for this subagent across all its turns
@@ -334,8 +297,6 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
 
         } else if (hasPatchedTokens) {
           // ── Main agent — Patched mode ─────────────────────────────────
-          // Only attribute tokens to main-agent turns: those that carry
-          // both data.turnId and exact patched token fields.
           const patchedTokens = getPatchedTokenUsage(event);
           const isMainTurn = event.data.turnId != null && patchedTokens != null;
 
@@ -352,13 +313,6 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
               estimated: false,
               cost: msgCost,
             };
-            inputPerMessage.push(patchedTokens.input);
-            outputPerMessage.push(patchedTokens.output);
-            totalInput += patchedTokens.input;
-            totalOutput += patchedTokens.output;
-            totalCacheRead += patchedTokens.cacheRead;
-            totalCost += msgCost;
-            cumulativeTokens.push(totalInput + totalOutput);
           }
 
           messages.push({
@@ -373,38 +327,8 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
           });
 
         } else {
-          // ── Main agent — Estimation mode ─────────────────────────────
-          // Copilot caches the system prompt + tool definitions on every
-          // call after the first.  The non-cached input is the growing
-          // conversation context.
-          const sysTokens = activeSystemChars > 0
-            ? Math.round(activeSystemChars / CHARS_PER_TOKEN)
-            : systemOverheadTokens;
-
-          const estInputTokens = Math.round(conversationChars / CHARS_PER_TOKEN);
-          const estCacheRead = prevInputTokens === 0 ? 0 : (sysTokens + toolDefsOverhead);
-          const exactOutputTokens = event.data.outputTokens ?? 0;
-
-          const msgCost = calculateCost(
-            { input: estInputTokens, output: exactOutputTokens, cacheRead: estCacheRead },
-            model
-          );
-
-          inputPerMessage.push(estInputTokens);
-          outputPerMessage.push(exactOutputTokens);
-          totalInput += estInputTokens;
-          totalOutput += exactOutputTokens;
-          totalCacheRead += estCacheRead;
-          totalCost += msgCost;
-          cumulativeTokens.push(totalInput + totalOutput);
-
-          // After this API call the assistant response is added to context
-          conversationChars += msgContent.length;
-          if (event.data.toolRequests && event.data.toolRequests.length > 0) {
-            conversationChars += JSON.stringify(event.data.toolRequests).length;
-          }
-          // Mark that at least one turn has been seen (so subsequent turns use cache estimate)
-          prevInputTokens = estInputTokens + estCacheRead;
+          // ── Main agent — No estimation, only output ──────────────────
+          const exactOutputTokens = typeof event.data.outputTokens === 'number' ? event.data.outputTokens : 0;
 
           messages.push({
             id: event.id,
@@ -414,13 +338,11 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
             timestamp: event.timestamp,
             model,
             toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-            tokens: {
-              input: estInputTokens,
+            tokens: exactOutputTokens > 0 ? {
+              input: 0,
               output: exactOutputTokens,
-              cacheRead: estCacheRead,
-              estimated: true,
-              cost: msgCost,
-            },
+              estimated: false,
+            } : undefined,
           });
         }
 
@@ -439,9 +361,6 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
               timestamp: event.timestamp,
               toolResult: result,
             });
-            // Tool results are fed back to the subagent on the next turn — advance its context
-            const curConvChars = subAgentConvChars.get(event.agentId) ?? 0;
-            subAgentConvChars.set(event.agentId, curConvChars + result.content.length);
           } else {
             // ── Main agent tool result ─────────────────────────────────
             messages.push({
@@ -452,10 +371,6 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
               timestamp: event.timestamp,
               toolResult: result,
             });
-            // Tool results are sent back to the model in the next request (estimation mode only)
-            if (!hasPatchedTokens) {
-              conversationChars += result.content.length;
-            }
           }
         }
 
@@ -483,50 +398,21 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
             estimated: false,
             cost,
           };
-          // Accumulate subagent tokens into session-level totals
-          inputPerMessage.push(patchedTokens.input);
-          outputPerMessage.push(patchedTokens.output);
-          totalInput += patchedTokens.input;
-          totalOutput += patchedTokens.output;
-          totalCacheRead += patchedTokens.cacheRead;
-          totalCost += cost;
-          cumulativeTokens.push(totalInput + totalOutput);
           // Backfill agent.totalTokens if not yet set
           if (agent && agent.totalTokens == null) {
             agent.totalTokens = patchedTokens.input + patchedTokens.output;
           }
         } else {
-          // No snake_case patched tokens — use accumulated per-message values:
-          //   output  = exact sum from subagent assistant.message outputTokens
-          //   input   = estimated sum from per-turn context estimation
-          //   cost    = pre-summed per-message cost (accounts for cacheRead per turn)
+          // Fall back to accumulated output tokens from subagent messages
           const outTokens = subAgentOutputMap.get(refId ?? '') ?? 0;
-          const inTokens = subAgentInputMap.get(refId ?? '') ??
-            // Fallback: if estimation data missing, try to infer from event.data.totalTokens
-            (typeof event.data.totalTokens === 'number' && event.data.totalTokens > outTokens
-              ? event.data.totalTokens - outTokens
-              : 0);
-          const accumulatedCost = subAgentCostMap.get(refId ?? '') ?? 0;
+          const inTokens = 0;
 
           if (outTokens > 0 || inTokens > 0) {
-            // Use pre-summed cost if available; otherwise fall back to a single calculateCost call
-            const subAgentModel = agent?.model || model;
-            const cost = accumulatedCost > 0
-              ? accumulatedCost
-              : calculateCost({ input: inTokens, output: outTokens }, subAgentModel);
             completionTokens = {
               input: inTokens,
               output: outTokens,
-              estimated: true,
-              cost,
+              estimated: false,
             };
-            // Accumulate into session-level totals (always push both to keep arrays paired)
-            inputPerMessage.push(inTokens);
-            outputPerMessage.push(outTokens);
-            totalInput += inTokens;
-            totalOutput += outTokens;
-            totalCost += cost;
-            cumulativeTokens.push(totalInput + totalOutput);
             // Backfill agent.totalTokens if not yet set
             if (agent && agent.totalTokens == null) {
               agent.totalTokens = inTokens + outTokens;
@@ -583,6 +469,11 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
           timestamp: agent.endTime ?? agent.startTime,
         });
       }
+
+      // Backfill agent.totalTokens if missing from subagent.completed
+      if (agent.messages.length > 0 && agent.model && agent.totalTokens == null) {
+        agent.totalTokens = subAgentOutputMap.get(agent.id) ?? 0;
+      }
     }
 
     // ---------------------------------------------------------------
@@ -606,20 +497,63 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
       duration = end - start;
     }
 
+    // Build per-message arrays from messages that have tokens (for charts)
+    // Only main-agent messages contribute to the chart arrays
+    for (const msg of messages) {
+      if (msg.tokens && (msg.role === 'assistant' || msg.tokens.output > 0)) {
+        inputPerMessage.push(msg.tokens.input);
+        outputPerMessage.push(msg.tokens.output);
+      }
+    }
+    // Build cumulative from outputs only (since input is 0 for non-patched)
+    let cumSum = 0;
+    for (let i = 0; i < inputPerMessage.length; i++) {
+      cumSum += inputPerMessage[i] + outputPerMessage[i];
+      cumulativeTokens.push(cumSum);
+    }
+
     const tokenStats = assistantMessages > 0
       ? {
-          totalInput,
-          totalOutput,
-          totalCacheRead,
-          totalCacheCreation: 0,
-          totalCost,
+          totalInput: exactTotalInput,
+          totalOutput: exactTotalOutput,
+          totalCacheRead: exactTotalCacheRead,
+          totalCacheCreation: exactTotalCacheCreation,
+          totalCost: exactTotalCost,
           inputPerMessage,
           outputPerMessage,
           cumulativeTokens,
         }
       : undefined;
 
-    const totalTokens = assistantMessages > 0 ? totalInput + totalOutput : undefined;
+    const totalTokens = exactTotalInput + exactTotalOutput;
+
+    // Per-model breakdown (from shutdown data)
+    let usedModels: SessionSummary['usedModels'];
+    if (shutdownData) {
+      const entries: NonNullable<SessionSummary['usedModels']> = [];
+      for (const modelName of Object.keys(shutdownData)) {
+        const m = shutdownData[modelName];
+        entries.push({
+          model: modelName,
+          inputTokens: m.usage.inputTokens,
+          outputTokens: m.usage.outputTokens,
+          totalTokens: m.usage.inputTokens + m.usage.outputTokens,
+          requestCount: m.requests.count,
+          cost: calculateCost(
+            {
+              input: m.usage.inputTokens,
+              output: m.usage.outputTokens,
+              cacheRead: m.usage.cacheReadTokens,
+              cacheCreation: m.usage.cacheWriteTokens,
+            },
+            modelName
+          ),
+        });
+      }
+      // Sort by totalTokens descending
+      entries.sort((a, b) => b.totalTokens - a.totalTokens);
+      usedModels = entries;
+    }
 
     const stats: SessionStats = {
       messageCount: messages.length,
@@ -645,8 +579,9 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
       startTime,
       lastActivity,
       messageCount: messages.length,
-      totalTokens,
+      totalTokens: totalTokens > 0 ? totalTokens : undefined,
       model,
+      usedModels,
       messages,
       stats,
       toolUsage,
@@ -672,4 +607,3 @@ export function getCopilotSessionSummary(detail: SessionDetail): SessionSummary 
     subAgentCount: detail.subAgents?.length,
   };
 }
-

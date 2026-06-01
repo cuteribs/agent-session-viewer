@@ -66,7 +66,7 @@ const tokenChartData = computed(() => {
     labels,
     datasets: [
       {
-        label: props.session.source === 'copilot' ? '~Total Context' : 'Input Tokens',
+        label: 'Input Tokens',
         data: stats.tokens.inputPerMessage,
         borderColor: 'rgb(59, 130, 246)',
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
@@ -220,25 +220,17 @@ function formatTime(timestamp: string): string {
     <!-- Token Stats Summary -->
     <div v-if="session.stats.tokens" class="grid gap-4" :class="session.stats.tokens.totalCost != null && session.stats.tokens.totalCost > 0 ? 'grid-cols-5' : 'grid-cols-4'">
       <div class="bg-primary rounded-lg p-4 border border-default">
-        <p class="text-sm text-muted">
-          <span v-if="session.source === 'copilot'" class="text-amber-500">~</span>Total Input
-        </p>
+        <p class="text-sm text-muted">Total Input</p>
         <p class="text-2xl font-bold text-primary">{{ session.stats.tokens.totalInput.toLocaleString() }}</p>
-        <p v-if="session.source === 'copilot'" class="text-xs text-muted mt-1">conversation context</p>
       </div>
       <div class="bg-primary rounded-lg p-4 border border-default">
         <p class="text-sm text-muted">Total Output</p>
         <p class="text-2xl font-bold text-primary">{{ session.stats.tokens.totalOutput.toLocaleString() }}</p>
       </div>
       <div class="bg-primary rounded-lg p-4 border border-default">
-        <p class="text-sm text-muted">
-          <span v-if="session.source === 'copilot'" class="text-amber-500">~</span>Cache Read
-        </p>
+        <p class="text-sm text-muted">Cache Read</p>
         <p class="text-2xl font-bold text-primary">{{ session.stats.tokens.totalCacheRead.toLocaleString() }}</p>
-        <p class="text-xs text-muted mt-1">
-          <template v-if="session.source === 'copilot'">sys + tool overhead</template>
-          <template v-else>peak cached context</template>
-        </p>
+        <p class="text-xs text-muted mt-1">peak cached context</p>
       </div>
       <div class="bg-primary rounded-lg p-4 border border-default">
         <p class="text-sm text-muted">Cache Creation</p>
@@ -249,11 +241,9 @@ function formatTime(timestamp: string): string {
         v-if="session.stats.tokens.totalCost != null && session.stats.tokens.totalCost > 0"
         class="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-800"
       >
-        <p class="text-sm text-muted">
-          <span v-if="session.source === 'copilot'" class="text-amber-500">~</span>Total Cost
-        </p>
+        <p class="text-sm text-muted">Total Cost</p>
         <p class="text-2xl font-bold text-green-700 dark:text-green-400">{{ formatCost(session.stats.tokens.totalCost) }}</p>
-        <p class="text-xs text-muted mt-1">{{ session.source === 'copilot' ? 'input est.' : 'exact' }} · USD</p>
+        <p class="text-xs text-muted mt-1">exact · USD</p>
       </div>
     </div>
 
