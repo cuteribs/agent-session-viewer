@@ -17,6 +17,7 @@ const sourceOptions = [
   { value: 'copilot', label: 'Copilot', color: 'bg-purple-500' },
   { value: 'codex', label: 'Codex', color: 'bg-blue-500' },
   { value: 'opencode', label: 'Opencode', color: 'bg-teal-500' },
+  { value: 'vscode', label: 'VSCode', color: 'bg-blue-400' },
 ] as const
 
 const activeOption = sourceOptions.find(o => o.value === sessionsStore.sourceFilter) ?? sourceOptions[0]

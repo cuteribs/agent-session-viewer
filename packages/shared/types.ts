@@ -345,7 +345,7 @@ export interface SubAgent {
 
 export interface SessionSummary {
   id: string;
-  source: 'claude' | 'copilot' | 'codex' | 'opencode';
+  source: 'claude' | 'copilot' | 'codex' | 'opencode' | 'vscode';
   project: string;
   projectPath: string;
   startTime: string;
@@ -458,6 +458,7 @@ export interface AppConfig {
     copilot: string[];
     codex: string[];
     opencode: string[];
+    vscode: string[];
   };
   autoRefresh: boolean;
   refreshInterval: number;
@@ -472,7 +473,7 @@ export interface AppConfig {
 export interface WSMessage {
   type: 'session_updated' | 'session_created' | 'session_deleted' | 'watch_status';
   payload: {
-    source?: 'claude' | 'copilot' | 'codex' | 'opencode';
+    source?: 'claude' | 'copilot' | 'codex' | 'opencode' | 'vscode';
     sessionId?: string;
     data?: SessionSummary;
     active?: boolean;
@@ -488,6 +489,7 @@ export interface PathsResponse {
   copilot: string[];
   codex: string[];
   opencode: string[];
+  vscode: string[];
 }
 
 export interface ApiError {

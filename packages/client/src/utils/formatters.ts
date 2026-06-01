@@ -98,17 +98,19 @@ export function truncateText(text: string, maxLength: number): string {
   return text.slice(0, maxLength - 3) + '...';
 }
 
-export function getSourceColor(source: 'claude' | 'copilot' | 'codex' | 'opencode'): string {
+export function getSourceColor(source: 'claude' | 'copilot' | 'codex' | 'opencode' | 'vscode'): string {
   if (source === 'claude') return 'text-orange-500';
   if (source === 'codex') return 'text-blue-500';
   if (source === 'opencode') return 'text-teal-500';
+  if (source === 'vscode') return 'text-blue-400';
   return 'text-purple-500';
 }
 
-export function getSourceBgColor(source: 'claude' | 'copilot' | 'codex' | 'opencode'): string {
+export function getSourceBgColor(source: 'claude' | 'copilot' | 'codex' | 'opencode' | 'vscode'): string {
   if (source === 'claude') return 'bg-orange-500';
   if (source === 'codex') return 'bg-blue-500';
   if (source === 'opencode') return 'bg-teal-500';
+  if (source === 'vscode') return 'bg-blue-400';
   return 'bg-purple-500';
 }
 

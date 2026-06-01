@@ -17,6 +17,7 @@ export function initFileWatcher(broadcast: BroadcastFn): void {
     ...config.paths.copilot.map(p => `${p}/**/events.jsonl`),
     ...config.paths.codex.map(p => `${p}/**/*.jsonl`),
     ...config.paths.opencode.map(p => `${p}/session/**/*.json`),
+    ...config.paths.vscode.map(p => `${p}/**/chatSessions/*.{json,jsonl}`),
   ];
 
   console.log('Initializing file watcher for:', watchPaths);
@@ -128,6 +129,12 @@ function determineSource(
     }
   }
 
+  for (const vscodePath of config.paths.vscode) {
+    if (normalizedPath.includes(vscodePath.replace(/\\/g, '/'))) {
+      return 'vscode';
+    }
+  }
+
   // Fallback: check path patterns
   if (normalizedPath.includes('.claude/projects')) {
     return 'claude';
@@ -144,6 +151,12 @@ function determineSource(
   if (normalizedPath.includes('\\.local\\share\\opencode\\storage')) {
     return 'opencode';
   }
+  if (normalizedPath.includes('/workspaceStorage/') && normalizedPath.includes('/chatSessions/')) {
+    return 'vscode';
+  }
+  if (normalizedPath.includes('\\workspaceStorage\\') && normalizedPath.includes('\\chatSessions\\')) {
+    return 'vscode';
+  }
 
   return null;
 }
@@ -157,6 +170,8 @@ function extractSessionId(filePath: string, source: SessionSource): string | nul
     return basename(dirname(filePath));
   } else if (source === 'opencode') {
     return basename(filePath, '.json');
+  } else if (source === 'vscode') {
+    return basename(filePath).replace(/\.(json|jsonl)$/, '');
   }
   return null;
 }

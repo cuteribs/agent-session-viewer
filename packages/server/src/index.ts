@@ -97,6 +97,7 @@ server.listen(config.port, config.host, async () => {
   console.log(`  Copilot: ${config.paths.copilot.join(', ')}`);
   console.log(`  Codex: ${config.paths.codex.join(', ')}`);
   console.log(`  OpenCode: ${config.paths.opencode.join(', ')}`);
+  console.log(`  VSCode: ${config.paths.vscode.join(', ')}`);
 
   // Open browser if built UI is available
   if (existsSync(publicPath)) {

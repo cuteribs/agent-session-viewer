@@ -30,6 +30,8 @@ export function findSessionFiles(source: SessionSource): Map<string, string> {
     paths = config.paths.codex;
   } else if (source === 'opencode') {
     paths = config.paths.opencode;
+  } else if (source === 'vscode') {
+    paths = config.paths.vscode;
   } else {
     paths = [];
   }
@@ -48,6 +50,8 @@ export function findSessionFiles(source: SessionSource): Map<string, string> {
       findCodexSessionFiles(basePath, files);
     } else if (source === 'opencode') {
       findOpenCodeSessionFiles(basePath, files);
+    } else if (source === 'vscode') {
+      findVSCodeSessionFiles(basePath, files);
     }
   }
 
@@ -125,6 +129,37 @@ function findCodexSessionFiles(basePath: string, files: Map<string, string>): vo
   scanDir(basePath, 0);
 }
 
+function findVSCodeSessionFiles(basePath: string, files: Map<string, string>): void {
+  // VSCode: workspaceStorage/<project_id>/chatSessions/<session_id>.{json,jsonl}
+  try {
+    const projectDirs = readdirSync(basePath);
+    for (const projectDir of projectDirs) {
+      const projectPath = join(basePath, projectDir);
+      try {
+        if (!statSync(projectPath).isDirectory()) continue;
+        const chatSessionsPath = join(projectPath, 'chatSessions');
+        if (!existsSync(chatSessionsPath)) continue;
+
+        const sessionFiles = readdirSync(chatSessionsPath)
+          .filter(f => f.endsWith('.json') || f.endsWith('.jsonl'));
+
+        for (const sessionFile of sessionFiles) {
+          const filePath = join(chatSessionsPath, sessionFile);
+          const sessionId = basename(sessionFile).replace(/\.(json|jsonl)$/, '');
+          // If both .json and .jsonl exist for same session, prefer .jsonl (newer format)
+          if (!files.has(sessionId) || sessionFile.endsWith('.jsonl')) {
+            files.set(sessionId, filePath);
+          }
+        }
+      } catch {
+        // Skip unreadable project dirs
+      }
+    }
+  } catch (error) {
+    console.error(`Error scanning VSCode sessions at ${basePath}:`, error);
+  }
+}
+
 function findOpenCodeSessionFiles(basePath: string, files: Map<string, string>): void {
   // SQLite database (primary source for current sessions)
   try {
@@ -182,10 +217,10 @@ function extractCodexSessionId(filePath: string): string | null {
   return null;
 }
 
-export function listSessions(source?: 'claude' | 'copilot' | 'codex' | 'opencode' | 'all'): SessionSummary[] {
+export function listSessions(source?: 'claude' | 'copilot' | 'codex' | 'opencode' | 'vscode' | 'all'): SessionSummary[] {
   const sessions: SessionSummary[] = [];
   const sources: SessionSource[] =
-    source === 'all' || !source ? ['claude', 'copilot', 'codex', 'opencode'] : [source];
+    source === 'all' || !source ? ['claude', 'copilot', 'codex', 'opencode', 'vscode'] : [source];
 
   for (const src of sources) {
     const files = findSessionFiles(src);

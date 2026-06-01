@@ -21,6 +21,10 @@ function getDefaultOpenCodePath(): string {
   return join(homedir(), '.local', 'share', 'opencode', 'storage');
 }
 
+function getDefaultVSCodePath(): string {
+  return join(homedir(), 'AppData', 'Roaming', 'Code', 'User', 'workspaceStorage');
+}
+
 function parsePathList(envValue: string | undefined, defaultPath: string): string[] {
   if (!envValue || envValue.trim() === '') {
     return [defaultPath];
@@ -38,6 +42,7 @@ export interface ServerConfig {
     copilot: string[];
     codex: string[];
     opencode: string[];
+    vscode: string[];
   };
 }
 
@@ -52,6 +57,7 @@ export function getServerConfig(): ServerConfig {
       copilot: parsePathList(process.env.COPILOT_PATHS, getDefaultCopilotPath()),
       codex: parsePathList(process.env.CODEX_PATHS, getDefaultCodexPath()),
       opencode: parsePathList(process.env.OPENCODE_PATHS, getDefaultOpenCodePath()),
+      vscode: parsePathList(process.env.VSCODE_PATHS, getDefaultVSCodePath()),
     },
   };
 }
@@ -62,6 +68,7 @@ let appConfig: AppConfig = {
     copilot: getServerConfig().paths.copilot,
     codex: getServerConfig().paths.codex,
     opencode: getServerConfig().paths.opencode,
+    vscode: getServerConfig().paths.vscode,
   },
   autoRefresh: true,
   refreshInterval: 5000,

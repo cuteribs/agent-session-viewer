@@ -12,7 +12,9 @@ export const useSessionsStore = defineStore('sessions', () => {
   /** Separate loading flag for fetching session detail — does not hide the sidebar list */
   const detailLoading = ref(false)
   const error = ref<string | null>(null)
-  const sourceFilter = ref<'all' | 'claude' | 'copilot' | 'codex' | 'opencode'>('all')
+  const sourceFilter = ref<'all' | 'claude' | 'copilot' | 'codex' | 'opencode' | 'vscode'>(
+    (localStorage.getItem('sourceFilter') as any) || 'all'
+  )
   const searchQuery = ref('')
   const activeView = ref<ViewMode>('timeline')
   const previewMessage = ref<Message | null>(null)
@@ -87,7 +89,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     }
   }
 
-  async function selectSession(source: 'claude' | 'copilot' | 'codex' | 'opencode', sessionId: string) {
+  async function selectSession(source: 'claude' | 'copilot' | 'codex' | 'opencode' | 'vscode', sessionId: string) {
     detailLoading.value = true
     error.value = null
     try {
@@ -103,8 +105,9 @@ export const useSessionsStore = defineStore('sessions', () => {
     currentSession.value = null
   }
 
-  function setSourceFilter(filter: 'all' | 'claude' | 'copilot' | 'codex' | 'opencode') {
+  function setSourceFilter(filter: 'all' | 'claude' | 'copilot' | 'codex' | 'opencode' | 'vscode') {
     sourceFilter.value = filter
+    localStorage.setItem('sourceFilter', filter)
     loadSessions()
   }
 
@@ -132,7 +135,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     showSettings.value = false
   }
 
-  async function removeSession(source: 'claude' | 'copilot' | 'codex' | 'opencode', sessionId: string) {
+  async function removeSession(source: 'claude' | 'copilot' | 'codex' | 'opencode' | 'vscode', sessionId: string) {
     loading.value = true
     error.value = null
     try {
@@ -220,7 +223,7 @@ export const useSessionsStore = defineStore('sessions', () => {
               currentSession.value.source === msg.payload.source
             ) {
               console.log('Reloading current session due to update')
-              selectSession(msg.payload.source as 'claude' | 'copilot' | 'codex' | 'opencode', msg.payload.sessionId)
+              selectSession(msg.payload.source as 'claude' | 'copilot' | 'codex' | 'opencode' | 'vscode', msg.payload.sessionId)
             }
           }
           break

@@ -119,16 +119,16 @@ function summarizeArgs(args: Record<string, unknown>): string {
       </div>
 
       <!-- Message content -->
-      <div class="px-4 py-3">
-        <p v-if="message.content" class="text-sm text-primary whitespace-pre-wrap break-words">
+      <div class="px-4">
+        <p v-if="message.content" class="text-sm text-primary whitespace-pre-wrap break-words py-3">
           {{ truncateText(message.content, 500) }}
         </p>
-        <p v-else-if="!message.toolCalls?.length && !message.toolResult" class="text-sm text-muted italic">
+        <p v-else-if="!message.toolCalls?.length && !message.toolResult" class="text-sm text-muted italic py-3">
           (no content)
         </p>
 
         <!-- Tool calls grouped by name -->
-        <div v-if="message.toolCalls && message.toolCalls.length > 0" class="mt-3 space-y-2">
+        <div v-if="message.toolCalls && message.toolCalls.length > 0" class="pb-3 space-y-2">
           <div
             v-for="group in groupToolCalls(message.toolCalls)"
             :key="group.name"
@@ -158,7 +158,7 @@ function summarizeArgs(args: Record<string, unknown>): string {
         </div>
 
         <!-- Tool result indicator -->
-        <div v-if="message.toolResult" class="mt-3">
+        <div v-if="message.toolResult" class="pb-3">
           <span
             :class="[
               'inline-flex items-center gap-1 px-2 py-1 text-xs rounded',
