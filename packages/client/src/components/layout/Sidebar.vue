@@ -9,6 +9,22 @@ const { prefs, setListViewMode } = usePreferences()
 
 const isResizing = ref(false)
 const sidebarWidth = ref(prefs.value.sidebarWidth)
+const showSourceDropdown = ref(false)
+
+const sourceOptions = [
+  { value: 'all', label: 'All Agents', color: 'bg-gray-500' },
+  { value: 'claude', label: 'Claude', color: 'bg-orange-500' },
+  { value: 'copilot', label: 'Copilot', color: 'bg-purple-500' },
+  { value: 'codex', label: 'Codex', color: 'bg-blue-500' },
+  { value: 'opencode', label: 'Opencode', color: 'bg-teal-500' },
+] as const
+
+const activeOption = sourceOptions.find(o => o.value === sessionsStore.sourceFilter) ?? sourceOptions[0]
+
+function selectSource(value: string) {
+  sessionsStore.setSourceFilter(value as any)
+  showSourceDropdown.value = false
+}
 
 function startResize(e: MouseEvent) {
   isResizing.value = true
@@ -36,35 +52,42 @@ function stopResize() {
     class="bg-primary border-r border-default flex flex-col relative"
     :style="{ width: `${sidebarWidth}px` }"
   >
-    <!-- Filter tabs -->
-    <div class="flex border-b border-default">
+    <!-- Source filter dropdown -->
+    <div class="relative border-b border-default px-3 py-2">
+      <span class="text-xs text-muted mb-1 block">Agent</span>
       <button
-        v-for="filter in ['all', 'claude', 'copilot', 'codex', 'opencode'] as const"
-        :key="filter"
-        @click="sessionsStore.setSourceFilter(filter)"
-        :class="[
-          'flex-1 py-2 px-3 text-sm font-medium transition-colors capitalize',
-          sessionsStore.sourceFilter === filter
-            ? [
-                'border-b-2 text-white',
-                filter === 'all'      ? 'bg-gray-500    border-gray-500'    : '',
-                filter === 'claude'   ? 'bg-orange-500  border-orange-500'  : '',
-                filter === 'copilot'  ? 'bg-purple-500  border-purple-500'  : '',
-                filter === 'codex'    ? 'bg-blue-500    border-blue-500'    : '',
-                filter === 'opencode' ? 'bg-teal-500    border-teal-500'    : '',
-              ]
-            : [
-                'text-secondary hover:text-primary',
-                filter === 'claude'   ? 'hover:bg-orange-50    dark:hover:bg-orange-900/10'  : '',
-                filter === 'copilot'  ? 'hover:bg-purple-50    dark:hover:bg-purple-900/10' : '',
-                filter === 'codex'    ? 'hover:bg-blue-50      dark:hover:bg-blue-900/10'   : '',
-                filter === 'opencode' ? 'hover:bg-teal-50      dark:hover:bg-teal-900/10'   : '',
-                filter === 'all'      ? 'hover:bg-gray-100     dark:hover:bg-gray-700/30'   : '',
-              ]
-        ]"
+        @click="showSourceDropdown = !showSourceDropdown"
+        @blur="setTimeout(() => showSourceDropdown = false, 150)"
+        class="w-full flex items-center justify-between px-3 py-1.5 text-sm rounded border border-default bg-secondary hover:bg-tertiary transition-colors"
       >
-        {{ filter }}
+        <span class="flex items-center gap-2">
+          <span :class="['w-2 h-2 rounded-full', activeOption.color]" />
+          <span>{{ activeOption.label }}</span>
+        </span>
+        <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="showSourceDropdown ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'" />
+        </svg>
       </button>
+      <div
+        v-if="showSourceDropdown"
+        @mousedown.prevent
+        class="absolute top-full left-3 right-3 z-50 bg-primary border border-default rounded-lg shadow-lg py-1 mt-1"
+      >
+        <button
+          v-for="opt in sourceOptions"
+          :key="opt.value"
+          @click="selectSource(opt.value)"
+          :class="[
+            'w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors',
+            sessionsStore.sourceFilter === opt.value
+              ? 'bg-secondary font-medium'
+              : 'hover:bg-secondary text-secondary hover:text-primary'
+          ]"
+        >
+          <span :class="['w-2 h-2 rounded-full', opt.color]" />
+          {{ opt.label }}
+        </button>
+      </div>
     </div>
 
     <!-- View toggle -->

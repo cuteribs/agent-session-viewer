@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useSessionsStore } from '@/stores/sessions'
 import { formatDateTime, formatDuration, formatCost, getSourceBgColor } from '@/utils/formatters'
 import { getExportURL } from '@/utils/api'
@@ -21,6 +21,7 @@ const tabs = [
 
 const session = computed(() => sessionsStore.currentSession)
 const selectedSubAgent = computed(() => sessionsStore.selectedSubAgent)
+const showModels = ref(false)
 
 function handleExport(format: 'csv' | 'json') {
   if (!session.value) return
@@ -106,18 +107,44 @@ function handleExport(format: 'csv' | 'json') {
             <span class="text-muted">Tokens:</span>
             <TokenBadge :tokens="session.totalTokens" />
           </div>
-          <!-- Per-model breakdown (exact from session.shutdown) -->
-          <div v-if="session.usedModels?.length" class="flex items-center gap-3">
-            <span class="text-muted">Models:</span>
-            <span
-              v-for="m in session.usedModels"
-              :key="m.model"
-              class="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-              :title="`${m.requestCount} requests · Output: ${m.outputTokens.toLocaleString()} · Cost: ${formatCost(m.cost)}`"
+          <!-- Per-model breakdown: inline for single model, dropdown for 2+ -->
+          <template v-if="session.usedModels?.length === 1">
+            <div class="flex items-center gap-1">
+              <span class="text-muted">Model:</span>
+              <span class="font-medium">{{ session.usedModels[0].model }}</span>
+              <TokenBadge :tokens="session.usedModels[0].totalTokens" />
+              <span v-if="session.usedModels[0].cost > 0" class="font-semibold text-green-700 dark:text-green-400 text-xs">{{ formatCost(session.usedModels[0].cost) }}</span>
+            </div>
+          </template>
+          <div v-else-if="session.usedModels && session.usedModels.length > 1" class="relative">
+            <button
+              @click="showModels = !showModels"
+              @blur="setTimeout(() => showModels = false, 150)"
+              class="flex items-center gap-1.5 px-2 py-1 text-xs rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:opacity-80 transition-opacity"
             >
-              {{ m.model }}
-              <TokenBadge :tokens="m.totalTokens" />
-            </span>
+              <span class="opacity-70">{{ session.usedModels.length }} models</span>
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="showModels ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'" />
+              </svg>
+            </button>
+            <div
+              v-if="showModels"
+              @mousedown.prevent
+              class="absolute top-full left-0 mt-1 z-50 bg-primary border border-default rounded-lg shadow-lg p-3 min-w-[320px]"
+            >
+              <div
+                v-for="m in session.usedModels"
+                :key="m.model"
+                class="flex items-center justify-between py-1.5 first:pt-0 last:pb-0 border-b border-default last:border-0 text-xs"
+              >
+                <span class="font-medium text-primary pr-3">{{ m.model }}</span>
+                <div class="flex items-center gap-3 text-muted">
+                  <span :title="`${m.requestCount} API requests`">{{ m.requestCount }} req</span>
+                  <TokenBadge :tokens="m.totalTokens" />
+                  <span v-if="m.cost > 0" class="text-green-600 dark:text-green-400 font-medium">{{ formatCost(m.cost) }}</span>
+                </div>
+              </div>
+            </div>
           </div>
           <div v-else-if="session.model" class="flex items-center gap-1">
             <span class="text-muted">Model:</span>
