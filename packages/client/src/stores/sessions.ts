@@ -93,7 +93,27 @@ export const useSessionsStore = defineStore('sessions', () => {
     detailLoading.value = true
     error.value = null
     try {
-      currentSession.value = await fetchSession(source, sessionId)
+      const detail = await fetchSession(source, sessionId)
+      currentSession.value = detail
+
+      // Merge full data (tokens, cost, model, messageCount) back into the list entry
+      // so sidebar badges fill in without a full list reload.
+      if (detail) {
+        const idx = sessions.value.findIndex(s => s.id === sessionId && s.source === source)
+        if (idx >= 0) {
+          sessions.value[idx] = {
+            ...sessions.value[idx],
+            project:       detail.project,
+            messageCount:  detail.messageCount,
+            totalTokens:   detail.totalTokens,
+            cost:          detail.cost,
+            model:         detail.model,
+            usedModels:    detail.usedModels,
+            subAgentCount: detail.subAgentCount,
+            tokenNote:     detail.tokenNote,
+          }
+        }
+      }
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to load session'
     } finally {

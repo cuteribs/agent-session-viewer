@@ -22,7 +22,7 @@ function getDefaultOpenCodePath(): string {
 }
 
 function getDefaultVSCodePath(): string {
-  return join(homedir(), 'AppData', 'Roaming', 'Code', 'User', 'workspaceStorage');
+  return join(homedir(), 'AppData', 'Roaming', 'Code', 'User');
 }
 
 function parsePathList(envValue: string | undefined, defaultPath: string): string[] {

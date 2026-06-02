@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useSessionsStore } from '@/stores/sessions'
 import { usePreferences } from '@/composables/usePreferences'
 import SessionList from '@/components/sessions/SessionList.vue'
@@ -20,7 +20,9 @@ const sourceOptions = [
   { value: 'vscode', label: 'VSCode', color: 'bg-blue-400' },
 ] as const
 
-const activeOption = sourceOptions.find(o => o.value === sessionsStore.sourceFilter) ?? sourceOptions[0]
+const activeOption = computed(() =>
+  sourceOptions.find(o => o.value === sessionsStore.sourceFilter) ?? sourceOptions[0]
+)
 
 function selectSource(value: string) {
   sessionsStore.setSourceFilter(value as any)

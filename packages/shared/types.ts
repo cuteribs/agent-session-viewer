@@ -352,10 +352,16 @@ export interface SessionSummary {
   lastActivity: string;
   messageCount: number;
   totalTokens?: number;
+  cost?: number;
   model?: string;
   subAgentCount?: number;
   /** Per-model breakdown (populated from session.shutdown for copilot sessions). */
   usedModels?: UsedModelEntry[];
+  /**
+   * Present when token data is incomplete or approximate.
+   * e.g. "Session log only: last LLM round per turn; cached and subagent tokens excluded."
+   */
+  tokenNote?: string;
 }
 
 export interface UsedModelEntry {

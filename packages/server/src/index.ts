@@ -67,9 +67,12 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Serve static files if 'public' directory exists (production/standalone mode)
+// Serve static files only when the client bundle is present (production/standalone mode).
+// A server-only build (tsup only, no copyfiles) leaves dist/public/ absent or empty,
+// so we gate on index.html existing rather than just the directory.
 const publicPath = join(packageRoot, 'dist', 'public');
-if (existsSync(publicPath)) {
+const indexHtml  = join(publicPath, 'index.html');
+if (existsSync(indexHtml)) {
   console.log(`Serving static files from: ${publicPath}`);
   app.use(express.static(publicPath));
 
@@ -78,8 +81,10 @@ if (existsSync(publicPath)) {
     if (req.path.startsWith('/api/') || req.path.startsWith('/ws')) {
       return next();
     }
-    res.sendFile(join(publicPath, 'index.html'));
+    res.sendFile(indexHtml);
   });
+} else {
+  console.log('No client bundle found — running in API-only mode (use npm run build for full build)');
 }
 
 // Initialize file watcher
@@ -100,7 +105,7 @@ server.listen(config.port, config.host, async () => {
   console.log(`  VSCode: ${config.paths.vscode.join(', ')}`);
 
   // Open browser if built UI is available
-  if (existsSync(publicPath)) {
+  if (existsSync(indexHtml)) {
     try {
       const { default: open } = await import('open');
       console.log('Opening browser...');

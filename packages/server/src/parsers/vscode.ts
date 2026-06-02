@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, readdirSync } from 'fs';
 import { basename, dirname, join } from 'path';
 import type {
   SessionSummary,
@@ -7,7 +7,118 @@ import type {
   ToolCall,
   ToolUsageSummary,
   SessionStats,
+  UsedModelEntry,
+  SubAgent,
 } from '../types/index.js';
+import { calculateCost } from '../pricing.js';
+
+// ════════════════════════════════════════════════════════
+// Debug-log token extraction
+// Debug logs live at: workspaceStorage/<id>/GitHub.copilot-chat/debug-logs/<sessionId>/
+//   main.jsonl           — all LLM calls for the main session, one JSON span per line
+//   runSubagent-default-call_<toolCallId>.jsonl — LLM calls for a specific subagent
+// Each line has type=="llm_request" with attrs: { model, inputTokens, outputTokens, cachedTokens, ts }
+// ════════════════════════════════════════════════════════
+
+interface DebugRequestTokens {
+  inputTokens: number;
+  outputTokens: number;
+  cachedTokens: number;
+  roundCount: number;
+  model?: string;   // model of the majority (last) round
+}
+
+interface DebugLogTokens {
+  /** Indexed by request index (matches parsedRequests index) */
+  perRequest: DebugRequestTokens[];
+  /** Keyed by toolCallId (matches SubAgent.id) */
+  perSubagent: Map<string, DebugRequestTokens>;
+}
+
+function readDebugLogTokens(
+  sessionId: string,
+  chatSessionsPath: string,
+  requestTimestamps: number[],
+): DebugLogTokens | null {
+  // workspaceStorage/<id>/GitHub.copilot-chat/debug-logs/<sessionId>/
+  const chatSessionsDir = dirname(chatSessionsPath);
+  const workspaceDir    = dirname(chatSessionsDir);
+  const debugLogDir     = join(workspaceDir, 'GitHub.copilot-chat', 'debug-logs', sessionId);
+  if (!existsSync(debugLogDir)) return null;
+
+  const mainPath = join(debugLogDir, 'main.jsonl');
+  if (!existsSync(mainPath)) return null;
+
+  // ── Read main.jsonl: collect all llm_request spans (skip title sub-sessions) ──
+  interface LLMSpan { ts: number; inputTokens: number; outputTokens: number; cachedTokens: number; model: string }
+  const mainCalls: LLMSpan[] = [];
+  for (const line of readFileSync(mainPath, 'utf-8').split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const ev = JSON.parse(line) as Record<string, unknown>;
+      if (ev.type === 'llm_request') {
+        const a = ev.attrs as Record<string, unknown>;
+        // Skip side-channel models (gpt-4o-mini used for title generation)
+        const model = String(a.model ?? '');
+        if (model.includes('gpt-4o-mini')) continue;
+        mainCalls.push({
+          ts:           Number(ev.ts ?? 0),
+          inputTokens:  Number(a.inputTokens  ?? 0),
+          outputTokens: Number(a.outputTokens ?? 0),
+          cachedTokens: Number(a.cachedTokens ?? 0),
+          model,
+        });
+      }
+    } catch { /* skip malformed lines */ }
+  }
+
+  // ── Assign each call to a request bucket using timestamps ──
+  // requestTimestamps[i] = start of request i; upper bound = requestTimestamps[i+1]
+  const perRequest: DebugRequestTokens[] = requestTimestamps.map(() => ({
+    inputTokens: 0, outputTokens: 0, cachedTokens: 0, roundCount: 0, model: undefined,
+  }));
+
+  for (const call of mainCalls) {
+    // Find the latest request that started before or at this call's timestamp
+    let bucket = 0;
+    for (let i = 0; i < requestTimestamps.length; i++) {
+      if (call.ts >= requestTimestamps[i]) bucket = i;
+    }
+    perRequest[bucket].inputTokens  += call.inputTokens;
+    perRequest[bucket].outputTokens += call.outputTokens;
+    perRequest[bucket].cachedTokens += call.cachedTokens;
+    perRequest[bucket].roundCount++;
+    perRequest[bucket].model = call.model;
+  }
+
+  // ── Read per-subagent files: runSubagent-default-call_<toolCallId>.jsonl ──
+  const perSubagent = new Map<string, DebugRequestTokens>();
+  let files: string[] = [];
+  try { files = readdirSync(debugLogDir); } catch { /* ignore */ }
+  for (const fname of files) {
+    const m = fname.match(/^runSubagent-default-(call_.+)\.jsonl$/);
+    if (!m) continue;
+    const toolCallId = m[1];
+    const agg: DebugRequestTokens = { inputTokens: 0, outputTokens: 0, cachedTokens: 0, roundCount: 0 };
+    try {
+      for (const line of readFileSync(join(debugLogDir, fname), 'utf-8').split('\n')) {
+        if (!line.trim()) continue;
+        const ev = JSON.parse(line) as Record<string, unknown>;
+        if (ev.type === 'llm_request') {
+          const a = ev.attrs as Record<string, unknown>;
+          agg.inputTokens  += Number(a.inputTokens  ?? 0);
+          agg.outputTokens += Number(a.outputTokens ?? 0);
+          agg.cachedTokens += Number(a.cachedTokens ?? 0);
+          agg.roundCount++;
+          agg.model = String(a.model ?? '');
+        }
+      }
+    } catch { /* skip unreadable subagent files */ }
+    if (agg.roundCount > 0) perSubagent.set(toolCallId, agg);
+  }
+
+  return { perRequest, perSubagent };
+}
 
 // ── JSONL format types ──────────────────────────────────
 interface JsonlEvent {
@@ -27,22 +138,50 @@ interface VSCodeRequest {
   elapsedMs?: number;
 }
 
+interface VSCodeToolSpecificData {
+  kind: 'subagent' | string;
+  description?: string;
+  prompt?: string;
+  modelName?: string;
+  result?: string;
+}
+
 interface VSCodeResponsePart {
-  value?: string;
+  /** Plain text content (kind=undefined). Thinking parts may have value:[] at runtime. */
+  value?: unknown;
   kind?: string;
   toolName?: string;
   toolId?: string;
-  invocationMessage?: string;
-  pastTenseMessage?: string;
+  invocationMessage?: string | { value?: string };
+  pastTenseMessage?: string | { value?: string };
   isComplete?: boolean;
-  isConfirmed?: boolean;
+  isConfirmed?: unknown;
   toolCallId?: string;
   resultText?: string;
+  toolSpecificData?: VSCodeToolSpecificData;
+  /** URIs / resources that were used or produced by the tool */
+  resultDetails?: Array<{ scheme?: string; authority?: string; path?: string }>;
+  /** Set on tool calls made by a subagent (toolCallId of the parent subagent invocation) */
+  subAgentInvocationId?: string;
+  /** 'hidden' for internal patch-application tool calls */
+  presentation?: string;
+  /** For inlineReference parts: display name like "EventRecords.cs#L1" */
+  name?: string;
+  /** For inlineReference parts: the referenced URI */
+  inlineReference?: { uri?: { fsPath?: string; path?: string } };
 }
 
 interface VSCodeResult {
   timings?: { firstProgress?: number; totalElapsed?: number };
-  metadata?: Record<string, unknown>;
+  metadata?: {
+    promptTokens?: number;
+    outputTokens?: number;
+    cachedTokens?: number;
+    [key: string]: unknown;
+  };
+  /** The actual model used for this request turn (may differ from inputState.selectedModel) */
+  resolvedModel?: string;
+  modelId?: string;
 }
 
 interface VSCodeState {
@@ -96,12 +235,13 @@ interface VSCodeJsonResponsePart {
   kind?: string;
   toolName?: string;
   toolId?: string;
-  invocationMessage?: string;
+  invocationMessage?: string | { value?: string };
   pastTenseMessage?: string;
   isComplete?: boolean;
-  isConfirmed?: boolean;
+  isConfirmed?: unknown;
   toolCallId?: string;
   source?: { type?: string; label?: string };
+  toolSpecificData?: VSCodeToolSpecificData;
 }
 
 // ════════════════════════════════════════════════════════
@@ -183,16 +323,90 @@ function pushPath(obj: Record<string, unknown>, path: (string | number)[], value
   }
 }
 
+/**
+ * Extract a plain string from an invocationMessage / pastTenseMessage value.
+ * Both fields can be a bare string OR an object with a `value` property.
+ * VSCode markdown link syntax is cleaned up:
+ *   "[label](url)"  → label  (when label is non-empty)
+ *   "[](url)"       → decoded filename extracted from the URL
+ */
+function extractInvocationText(msg: string | { value?: string } | undefined | null): string {
+  if (!msg) return '';
+  const raw = typeof msg === 'string' ? msg : (msg.value ?? '');
+  return raw
+    .replace(/\[([^\]]*)\]\(([^)]+)\)/g, (_match, text: string, url: string) => {
+      if (text.trim()) return text.trim();
+      // Empty label — extract a readable path/filename from the URL
+      try {
+        const decoded = decodeURIComponent(url.replace(/^file:\/\/\//, '').replace(/\\/g, '/'));
+        // For local file URIs return the filename only; keep http(s) URLs as-is
+        if (!url.startsWith('http')) {
+          return decoded.split('/').filter(Boolean).pop() ?? decoded;
+        }
+        return decoded;
+      } catch {
+        return url;
+      }
+    })
+    .trim();
+}
+
+/**
+ * Build a short URL string from a VSCode `resultDetails` entry.
+ * Each entry has { scheme, authority, path } from the VS Code URI format.
+ */
+function formatResultDetail(d: { scheme?: string; authority?: string; path?: string }): string {
+  if (d.scheme && d.authority && d.path) return `${d.scheme}://${d.authority}${d.path}`;
+  if (d.path) return d.path;
+  return '';
+}
+
 // ════════════════════════════════════════════════════════
 // Common: build messages from requests[]
 // ════════════════════════════════════════════════════════
+
+// ────────────────────────────────────────────────────────
+// Deduplicate incremental session log entries
+// ────────────────────────────────────────────────────────
+
+/**
+ * Deduplicate response parts by toolCallId.
+ *
+ * VSCode writes the session log incrementally: the initial `kind=2 k=["requests"]` push
+ * includes tool calls that are still in-flight.  Later `kind=2 k=["requests",N,"response"]`
+ * pushes append updated (completed) versions of the same tool calls, resulting in duplicates.
+ * We keep the LAST occurrence of each toolCallId (most complete / isComplete=true).
+ */
+function deduplicateResponseParts(parts: VSCodeResponsePart[]): VSCodeResponsePart[] {
+  const seenToolCallIds = new Set<string>();
+  // Scan reversed to identify which indices to keep
+  const keepIdx = new Set<number>();
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i];
+    if (p.kind === 'toolInvocationSerialized' && p.toolCallId) {
+      if (!seenToolCallIds.has(p.toolCallId)) {
+        seenToolCallIds.add(p.toolCallId);
+        keepIdx.add(i);
+      }
+      // else: earlier (duplicate) occurrence — drop it
+    } else {
+      keepIdx.add(i);
+    }
+  }
+  return parts.filter((_, i) => keepIdx.has(i));
+}
 
 interface ParsedRequest {
   requestId: string;
   timestamp: number;
   userText: string;
   responseParts: VSCodeResponsePart[];
+  /** Total output tokens across all tool rounds (cumulative) */
   completionTokens?: number;
+  /** Input tokens from result.metadata.promptTokens (last round) */
+  promptTokens?: number;
+  /** Resolved model for this specific request */
+  resolvedModel?: string;
   elapsedMs?: number;
 }
 
@@ -215,6 +429,8 @@ function extractRequestsJsonl(state: VSCodeState): ParsedRequest[] {
       userText,
       responseParts: parts,
       completionTokens: req.completionTokens,
+      promptTokens: req.result?.metadata?.promptTokens,
+      resolvedModel: req.result?.resolvedModel || req.result?.modelId,
       elapsedMs: req.elapsedMs,
     });
   }
@@ -244,6 +460,7 @@ function extractRequestsJson(session: VSCodeJsonSession): ParsedRequest[] {
             isComplete: p.isComplete,
             isConfirmed: p.isConfirmed,
             toolCallId: p.toolCallId,
+            toolSpecificData: p.toolSpecificData,
           });
         }
       }
@@ -278,11 +495,26 @@ function buildSession(
   const inputPerMessage: number[] = [];
   const outputPerMessage: number[] = [];
   const cumulativeTokens: number[] = [];
+  let totalInput = 0;
   let totalOutput = 0;
+  let totalCacheRead = 0;
+  let totalCost = 0;
   let cumulativeTotal = 0;
 
+  // Per-model aggregates for usedModels
+  const modelAggMap = new Map<string, { input: number; output: number; cacheRead: number; cost: number; count: number }>();
+
+  // Subagent tracking — deduplicated by toolCallId
+  const subAgentMap = new Map<string, SubAgent>();
+
+  // ── Debug-log token data (more accurate than chatSessions metadata) ──
+  const requestTimestamps = parsedRequests.map(r => r.timestamp);
+  const debugTokens = readDebugLogTokens(sessionId, sourcePath, requestTimestamps);
+
+  let reqIdx = -1;
   for (const req of parsedRequests) {
     if (!req.userText && !req.responseParts.length) continue;
+    reqIdx++;
 
     // User message
     if (req.userText) {
@@ -297,53 +529,154 @@ function buildSession(
     }
 
     // Assistant response
-    const textParts: string[] = [];
+    let content = '';
+    /** true when the previous content-contributing part was an inlineReference (inline, no separator needed) */
+    let lastWasInlineRef = false;
     const toolCalls: ToolCall[] = [];
 
-    for (const part of req.responseParts) {
+    const deduped = deduplicateResponseParts(req.responseParts);
+
+    for (const part of deduped) {
       if (part.kind === 'toolInvocationSerialized') {
         const name = part.toolId || part.toolName || 'unknown';
+        const tsd = part.toolSpecificData;
+
+        // Detect VSCode subagent invocations
+        if (tsd?.kind === 'subagent' && part.toolCallId && !subAgentMap.has(part.toolCallId)) {
+          const reqTs = new Date(req.timestamp).toISOString();
+          subAgentMap.set(part.toolCallId, {
+            id: part.toolCallId,
+            agentId: 'runSubagent',
+            agentType: 'runSubagent',
+            agentDisplayName: tsd.description || 'Subagent',
+            description: tsd.description,
+            prompt: tsd.prompt,
+            status: part.isComplete ? 'completed' : 'started',
+            result: tsd.result,
+            model: tsd.modelName,
+            startTime: reqTs,
+            endTime: part.isComplete ? reqTs : undefined,
+          });
+        }
+
+        // Build a human-readable arguments.input from the invocation/completion message.
+        // Prefer pastTenseMessage (describes what was done) when the call is complete.
+        const completedText = part.isComplete ? extractInvocationText(part.pastTenseMessage) : '';
+        const invocationText = extractInvocationText(part.invocationMessage);
+        let inputText = completedText || invocationText;
+
+        // For subagents without a pastTenseMessage, the description is more useful
+        if (!inputText && tsd?.description) inputText = tsd.description;
+
+        // Append resultDetails URLs when they aren't already in the message
+        if (part.resultDetails?.length) {
+          const urls = part.resultDetails
+            .map(formatResultDetail)
+            .filter(Boolean)
+            .join(', ');
+          if (urls && !inputText.includes(urls.split(',')[0].trim())) {
+            inputText = inputText ? `${inputText} — ${urls}` : urls;
+          }
+        }
+
         toolCalls.push({
           id: part.toolCallId || `${name}-${toolCalls.length}`,
           name,
-          arguments: {},
+          arguments: inputText ? { input: inputText } : {},
         });
 
         const existing = toolUsageMap.get(name) || { count: 0 };
         existing.count++;
         toolUsageMap.set(name, existing);
-      } else if (part.value) {
-        textParts.push(part.value);
+        lastWasInlineRef = false;
+
+      } else if (!part.kind && typeof part.value === 'string') {
+        // Plain text part — skip pure code-fence delimiters that VSCode injects
+        // around file-edit blocks (they are just UI decoration, not LLM prose).
+        if (/^[\s`]*$/.test(part.value)) {
+          lastWasInlineRef = false;
+          continue;
+        }
+        // Add a paragraph break when transitioning between separate prose blocks,
+        // but NOT when flowing directly after an inline reference.
+        if (!lastWasInlineRef && content && !content.endsWith('\n')) {
+          content += '\n\n';
+        }
+        content += part.value;
+        lastWasInlineRef = false;
+
+      } else if (part.kind === 'inlineReference') {
+        // File / symbol reference — use the display name, stripping the #L1 range suffix.
+        const displayName = (part.name ?? '').replace(/#.*$/, '');
+        if (displayName) {
+          content += '`' + displayName + '`';
+          lastWasInlineRef = true;
+        }
+      } else {
+        // thinking, mcpServersStarting, undoStop, codeblockUri, textEditGroup, etc. — ignore
+        lastWasInlineRef = false;
       }
     }
 
-    const outputTokens = req.completionTokens ?? 0;
-    if (outputTokens > 0) {
-      totalOutput += outputTokens;
+    // ── Token data: prefer debug log (all rounds + cached), fall back to chatSessions ──
+    const dbg = debugTokens?.perRequest[reqIdx];
+    const outputTokens = dbg?.outputTokens ?? req.completionTokens ?? 0;
+    const inputTokens  = dbg?.inputTokens  ?? req.promptTokens    ?? 0;  // TOTAL (incl. cached)
+    const cachedTokens = dbg?.cachedTokens ?? 0;
+    const hasTokenData = outputTokens > 0 || inputTokens > 0;
+    // Use per-request resolvedModel, fall back to debug log model, then session-level modelName
+    const reqModel = req.resolvedModel || dbg?.model || modelName;
+    // OpenAI billing model: inputTokens is TOTAL (inclusive of cached).
+    // calculateCost expects non-overlapping input + cacheRead, so subtract cached from input.
+    const nonCachedInput = dbg ? Math.max(0, inputTokens - cachedTokens) : inputTokens;
+    const msgCost = calculateCost({ input: nonCachedInput, output: outputTokens, cacheRead: cachedTokens }, reqModel);
+
+    if (hasTokenData) {
+      totalOutput    += outputTokens;
+      totalInput     += inputTokens;
+      totalCacheRead += cachedTokens;
+      totalCost      += msgCost;
       outputPerMessage.push(outputTokens);
-      inputPerMessage.push(0);
-      cumulativeTotal += outputTokens;
+      inputPerMessage.push(inputTokens);
+      cumulativeTotal += inputTokens + outputTokens;
       cumulativeTokens.push(cumulativeTotal);
+
+      // Aggregate per model
+      const key = reqModel ?? '__unknown__';
+      const agg = modelAggMap.get(key) ?? { input: 0, output: 0, cacheRead: 0, cost: 0, count: 0 };
+      agg.input     += inputTokens;
+      agg.output    += outputTokens;
+      agg.cacheRead += cachedTokens;
+      agg.cost      += msgCost;
+      agg.count++;
+      modelAggMap.set(key, agg);
     }
 
-    const content = textParts.join('\n').trim();
-    if (content || toolCalls.length > 0) {
+    const finalContent = content.trim();
+    if (finalContent || toolCalls.length > 0) {
       const ts = new Date(req.timestamp + 100).toISOString();
+      // Find first subagent toolCallId in this request (for subAgentRef)
+      const firstSubagentCallId = req.responseParts
+        .find(p => p.kind === 'toolInvocationSerialized' && p.toolSpecificData?.kind === 'subagent')
+        ?.toolCallId;
+
       const msg: Message = {
         id: req.requestId ? `asst-${req.requestId}` : `asst-${Date.now()}-${Math.random()}`,
         parentId: req.requestId ? `user-${req.requestId}` : null,
         role: 'assistant',
-        content,
+        content: finalContent,
         timestamp: ts,
-        model: modelName,
+        model: reqModel,
         toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+        subAgentRef: firstSubagentCallId,
       };
 
-      if (outputTokens > 0) {
+      if (hasTokenData) {
         msg.tokens = {
-          input: 0,
+          input: inputTokens,
           output: outputTokens,
-          cost: 0,
+          cacheRead: cachedTokens > 0 ? cachedTokens : undefined,
+          cost: msgCost,
         };
       }
 
@@ -364,7 +697,40 @@ function buildSession(
     duration = end - start;
   }
 
-  const hasTokens = outputPerMessage.length > 0;
+  // ── Subagent debug-log patch (must run BEFORE stats/totals are finalised) ──
+  if (debugTokens) {
+    for (const [toolCallId, sa] of subAgentMap) {
+      const dbgSA = debugTokens.perSubagent.get(toolCallId);
+      if (dbgSA) {
+        sa.totalTokens = dbgSA.inputTokens + dbgSA.outputTokens;
+
+        const saModel = dbgSA.model || sa.model || modelName;
+        // OpenAI billing: inputTokens is total inclusive of cached — subtract for non-cached portion
+        const saNonCachedInput = Math.max(0, dbgSA.inputTokens - dbgSA.cachedTokens);
+        const saCost = calculateCost({
+          input: saNonCachedInput,
+          output: dbgSA.outputTokens,
+          cacheRead: dbgSA.cachedTokens,
+        }, saModel);
+
+        totalInput     += dbgSA.inputTokens;
+        totalOutput    += dbgSA.outputTokens;
+        totalCacheRead += dbgSA.cachedTokens;
+        totalCost      += saCost;
+
+        const key = saModel ?? '__unknown__';
+        const agg = modelAggMap.get(key) ?? { input: 0, output: 0, cacheRead: 0, cost: 0, count: 0 };
+        agg.input     += dbgSA.inputTokens;
+        agg.output    += dbgSA.outputTokens;
+        agg.cacheRead += dbgSA.cachedTokens;
+        agg.cost      += saCost;
+        modelAggMap.set(key, agg);
+      }
+    }
+  }
+  const subAgents = subAgentMap.size > 0 ? Array.from(subAgentMap.values()) : undefined;
+
+  const hasTokens = outputPerMessage.length > 0 || inputPerMessage.length > 0;
 
   const stats: SessionStats = {
     messageCount: messages.length,
@@ -372,11 +738,11 @@ function buildSession(
     assistantMessages: asstMsgs,
     tokens: hasTokens
       ? {
-          totalInput: 0,
+          totalInput,
           totalOutput,
-          totalCacheRead: 0,
+          totalCacheRead,
           totalCacheCreation: 0,
-          totalCost: 0,
+          totalCost,
           inputPerMessage,
           outputPerMessage,
           cumulativeTokens,
@@ -390,29 +756,43 @@ function buildSession(
 
   const startTime = messages[0]?.timestamp || new Date(creationDate || Date.now()).toISOString();
   const lastActivity = messages[messages.length - 1]?.timestamp || startTime;
-  const totalTokens = hasTokens ? totalOutput : undefined;
+  const totalTokens = hasTokens ? totalInput + totalOutput : undefined;
 
-  // Read workspace.json to get the actual project folder path
-  let projectName = 'Unknown';
-  const wsDir = dirname(dirname(sourcePath));
-  const workspaceJsonPath = join(wsDir, 'workspace.json');
+  // Token data provenance note — present when debug logs were unavailable
+  const tokenNote = hasTokens && !debugTokens
+    ? 'Approximate (session log only): input = last LLM round per turn; cached and subagent tokens not included.'
+    : undefined;
+
+  let usedModels: UsedModelEntry[] | undefined;
+  if (modelAggMap.size > 0) {
+    usedModels = Array.from(modelAggMap.entries())
+      .map(([model, agg]) => ({
+        model: model === '__unknown__' ? (modelName ?? 'Unknown') : model,
+        inputTokens: agg.input,
+        outputTokens: agg.output,
+        totalTokens: agg.input + agg.output,
+        requestCount: agg.count,
+        cost: agg.cost,
+      }))
+      .sort((a, b) => b.totalTokens - a.totalTokens);
+  }
+  // Read workspace.json to get the actual project folder path.
+  // For globalStorage/emptyWindowChatSessions, no workspace.json exists.
+  let projectName = 'Empty Window';
+  const chatSessionsDir = dirname(sourcePath);                // .../chatSessions
+  const storageEntryDir = dirname(chatSessionsDir);           // .../workspaceStorage/<hash>  OR  .../globalStorage
+  const workspaceJsonPath = join(storageEntryDir, 'workspace.json');
   if (existsSync(workspaceJsonPath)) {
     try {
       const wsData = JSON.parse(readFileSync(workspaceJsonPath, 'utf-8'));
       if (wsData.folder) {
         const urlStr = wsData.folder as string;
-        const decoded = decodeURIComponent(urlStr.replace('file:///', '').replace(/\\/g, '/'));
+        const decoded = decodeURIComponent(urlStr.replace(/^file:\/\/\//, '').replace(/\\/g, '/'));
         projectName = basename(decoded);
       }
     } catch {
-      // fall back to path-based name
-    }
-  }
-  if (projectName === 'Unknown') {
-    const dirParts = sourcePath.replace(/\\/g, '/').split('/');
-    const wsIdx = dirParts.findIndex(d => d === 'workspaceStorage');
-    if (wsIdx >= 0 && dirParts[wsIdx + 1]) {
-      projectName = dirParts[wsIdx + 1];
+      // fall back to hash dir name
+      projectName = basename(storageEntryDir) || 'Unknown';
     }
   }
 
@@ -425,9 +805,14 @@ function buildSession(
     lastActivity,
     messageCount: messages.length,
     totalTokens,
+    cost: hasTokens ? totalCost : undefined,
     model: modelName,
+    usedModels,
+    subAgentCount: subAgents?.length,
+    tokenNote,
     messages,
     stats,
+    subAgents,
     toolUsage: Array.from(toolUsageMap.entries()).map(([name, { count }]) => ({
       name, count, successRate: 1,
     })),
@@ -518,6 +903,10 @@ export function getVSCodeSessionSummary(detail: SessionDetail): SessionSummary {
     lastActivity: detail.lastActivity,
     messageCount: detail.messageCount,
     totalTokens: detail.totalTokens,
+    cost: detail.cost,
     model: detail.model,
+    usedModels: detail.usedModels,
+    subAgentCount: detail.subAgentCount,
+    tokenNote: detail.tokenNote,
   };
 }

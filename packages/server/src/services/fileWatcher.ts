@@ -1,6 +1,6 @@
 import chokidar from 'chokidar';
 import { getServerConfig } from '../config.js';
-import { invalidateSession, getSession } from './sessionService.js';
+import { invalidateSession, invalidateFileListCache, getSession } from './sessionService.js';
 import { getSessionSummary, type SessionSource } from '../parsers/index.js';
 import type { WSMessage } from '../types/index.js';
 import { basename, dirname } from 'path';
@@ -17,7 +17,8 @@ export function initFileWatcher(broadcast: BroadcastFn): void {
     ...config.paths.copilot.map(p => `${p}/**/events.jsonl`),
     ...config.paths.codex.map(p => `${p}/**/*.jsonl`),
     ...config.paths.opencode.map(p => `${p}/session/**/*.json`),
-    ...config.paths.vscode.map(p => `${p}/**/chatSessions/*.{json,jsonl}`),
+    ...config.paths.vscode.map(p => `${p}/workspaceStorage/**/chatSessions/*.{json,jsonl}`),
+    ...config.paths.vscode.map(p => `${p}/globalStorage/emptyWindowChatSessions/*.{json,jsonl}`),
   ];
 
   console.log('Initializing file watcher for:', watchPaths);
@@ -64,6 +65,10 @@ function handleFileChange(
 
   // Invalidate cache
   invalidateSession(source, sessionId);
+  // For add/unlink, the file list itself changed — invalidate the per-source list cache
+  if (event === 'add' || event === 'unlink') {
+    invalidateFileListCache(source);
+  }
 
   // Determine message type and send update
   let messageType: WSMessage['type'];
@@ -154,7 +159,7 @@ function determineSource(
   if (normalizedPath.includes('/workspaceStorage/') && normalizedPath.includes('/chatSessions/')) {
     return 'vscode';
   }
-  if (normalizedPath.includes('\\workspaceStorage\\') && normalizedPath.includes('\\chatSessions\\')) {
+  if (normalizedPath.includes('/globalStorage/emptyWindowChatSessions/')) {
     return 'vscode';
   }
 

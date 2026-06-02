@@ -247,6 +247,18 @@ function formatTime(timestamp: string): string {
       </div>
     </div>
 
+    <!-- Token data provenance note -->
+    <div
+      v-if="session.tokenNote"
+      class="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-xs text-amber-800 dark:text-amber-300"
+    >
+      <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+      </svg>
+      <span>{{ session.tokenNote }}</span>
+    </div>
+
     <!-- Token Usage Over Time -->
     <div v-if="tokenChartData" class="bg-primary rounded-lg p-4 border border-default">
       <h3 class="text-lg font-semibold mb-4 text-primary">Token Usage Per Message</h3>

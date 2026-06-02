@@ -35,6 +35,7 @@ const PRICING_TABLE: Record<string, ModelPricing> = {
   'claude-opus-4.5':   { input: 5.00, cachedInput: 0.50, cacheWrite: 6.25, output: 25.00 },
   'claude-opus-4.6':   { input: 5.00, cachedInput: 0.50, cacheWrite: 6.25, output: 25.00 },
   'claude-opus-4.7':   { input: 5.00, cachedInput: 0.50, cacheWrite: 6.25, output: 25.00 },
+  'claude-opus-4.8':   { input: 5.00, cachedInput: 0.50, cacheWrite: 6.25, output: 25.00 },
   // ── Google ──────────────────────────────────────────────
   'gemini-2.5-pro':  { input: 1.25, cachedInput: 0.125, cacheWrite: 0, output: 10.00 },
   'gemini-3-flash':  { input: 0.50, cachedInput: 0.05,  cacheWrite: 0, output: 3.00  },
