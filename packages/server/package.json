@@ -16,9 +16,11 @@
   ],
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsup",
+    "build": "npm run build:client && npm run build:server && npm run build:public",
+    "build:client": "npm run --prefix ../client build",
+    "build:server": "tsup",
     "build:public": "copyfiles -u 3 \"../client/dist/**/*\" dist/public",
-    "prepublishOnly": "npm run build && npm run build:public",
+    "prepublishOnly": "npm run build",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit"
   },
