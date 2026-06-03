@@ -506,6 +506,8 @@ function buildSession(
 
   // Subagent tracking — deduplicated by toolCallId
   const subAgentMap = new Map<string, SubAgent>();
+  // Per-subagent tool-call parts collected from responseParts (keyed by subagent toolCallId)
+  const subAgentPartsMap = new Map<string, VSCodeResponsePart[]>();
 
   // ── Debug-log token data (more accurate than chatSessions metadata) ──
   const requestTimestamps = parsedRequests.map(r => r.timestamp);
@@ -557,6 +559,13 @@ function buildSession(
             startTime: reqTs,
             endTime: part.isComplete ? reqTs : undefined,
           });
+        }
+
+        // Collect tool-call parts that belong to a subagent (identified by subAgentInvocationId)
+        if (part.subAgentInvocationId && part.toolCallId) {
+          const arr = subAgentPartsMap.get(part.subAgentInvocationId) ?? [];
+          arr.push(part);
+          subAgentPartsMap.set(part.subAgentInvocationId, arr);
         }
 
         // Build a human-readable arguments.input from the invocation/completion message.
@@ -728,6 +737,86 @@ function buildSession(
       }
     }
   }
+  // ── Build messages[] for each subagent from its collected tool-call parts ──
+  for (const [toolCallId, sa] of subAgentMap) {
+    const parts = subAgentPartsMap.get(toolCallId);
+    const saMessages: Message[] = [];
+
+    // User message = the prompt
+    if (sa.prompt) {
+      saMessages.push({
+        id: `${toolCallId}-user`,
+        parentId: null,
+        role: 'user',
+        content: sa.prompt,
+        timestamp: sa.startTime,
+      });
+    }
+
+    // Tool calls made by the subagent → one assistant message per group
+    if (parts && parts.length > 0) {
+      const dedupedSaParts = deduplicateResponseParts(parts);
+      const saToolCalls: ToolCall[] = [];
+      let saTextParts = '';
+
+      for (const p of dedupedSaParts) {
+        if (p.kind === 'toolInvocationSerialized' && p.toolCallId) {
+          const name = p.toolId || p.toolName || 'unknown';
+          const completedText = p.isComplete ? extractInvocationText(p.pastTenseMessage) : '';
+          const invocationText = extractInvocationText(p.invocationMessage);
+          let inputText = completedText || invocationText;
+
+          if (p.resultDetails?.length) {
+            const urls = p.resultDetails
+              .map(formatResultDetail)
+              .filter(Boolean)
+              .join(', ');
+            if (urls && !inputText.includes(urls.split(',')[0].trim())) {
+              inputText = inputText ? `${inputText} — ${urls}` : urls;
+            }
+          }
+
+          saToolCalls.push({
+            id: p.toolCallId,
+            name,
+            arguments: inputText ? { input: inputText } : {},
+          });
+        } else if (!p.kind && typeof p.value === 'string' && !/^[\s`]*$/.test(p.value)) {
+          if (saTextParts && !saTextParts.endsWith('\n')) saTextParts += '\n\n';
+          saTextParts += p.value;
+        }
+      }
+
+      if (saToolCalls.length > 0 || saTextParts.trim()) {
+        saMessages.push({
+          id: `${toolCallId}-tools`,
+          parentId: `${toolCallId}-user`,
+          role: 'assistant',
+          content: saTextParts.trim(),
+          timestamp: sa.endTime || sa.startTime,
+          model: sa.model,
+          toolCalls: saToolCalls.length > 0 ? saToolCalls : undefined,
+        });
+      }
+    }
+
+    // Final result as a concluding assistant message (only if there are tool calls above)
+    if (sa.result && saMessages.length > 1) {
+      saMessages.push({
+        id: `${toolCallId}-result`,
+        parentId: `${toolCallId}-tools`,
+        role: 'assistant',
+        content: sa.result,
+        timestamp: sa.endTime || sa.startTime,
+        model: sa.model,
+      });
+    }
+
+    if (saMessages.length > 0) {
+      (sa as SubAgent & { messages?: Message[] }).messages = saMessages;
+    }
+  }
+
   const subAgents = subAgentMap.size > 0 ? Array.from(subAgentMap.values()) : undefined;
 
   const hasTokens = outputPerMessage.length > 0 || inputPerMessage.length > 0;
