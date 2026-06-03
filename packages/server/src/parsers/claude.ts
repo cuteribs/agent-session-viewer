@@ -79,6 +79,7 @@ export function parseClaudeSessionFile(filePath: string): SessionDetail | null {
       const contentBlocks = normalizeContent(message.content);
       const textContent = extractTextContent(contentBlocks);
       const toolCalls = extractToolCalls(contentBlocks);
+      const toolResults = extractToolResults(contentBlocks);
 
       // Track model
       if (message.model && !model) {
@@ -127,15 +128,22 @@ export function parseClaudeSessionFile(filePath: string): SessionDetail | null {
         toolUsageMap.set(tool.name, existing);
       }
 
+      // Build display content: prefer text/thinking, then tool_result, then tool_use summary
+      let displayContent = textContent;
+      if (!displayContent && toolResults.length > 0) {
+        displayContent = toolResults.map(r => r.content).join('\n');
+      }
+
       messages.push({
         id: entry.uuid,
         parentId: entry.parentUuid,
         role: message.role,
-        content: textContent,
+        content: displayContent,
         timestamp: entry.timestamp,
         model: message.model,
         tokens,
         toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+        toolResult: toolResults.length === 1 ? toolResults[0] : undefined,
       });
     }
 
@@ -320,6 +328,7 @@ function parseClaudeSubagentFile(filePath: string): SubAgent | null {
       const contentBlocks = normalizeContent(message.content);
       const textContent = extractTextContent(contentBlocks);
       const toolCalls = extractToolCalls(contentBlocks);
+      const toolResults = extractToolResults(contentBlocks);
 
       const tokens = message.usage
         ? {
@@ -339,15 +348,21 @@ function parseClaudeSubagentFile(filePath: string): SubAgent | null {
           }
         : undefined;
 
+      let displayContent = textContent;
+      if (!displayContent && toolResults.length > 0) {
+        displayContent = toolResults.map(r => r.content).join('\n');
+      }
+
       messages.push({
         id: entry.uuid,
         parentId: entry.parentUuid,
         role: message.role,
-        content: textContent,
+        content: displayContent,
         timestamp: entry.timestamp,
         model: message.model,
         tokens,
         toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+        toolResult: toolResults.length === 1 ? toolResults[0] : undefined,
       });
     }
 
@@ -386,9 +401,19 @@ function normalizeContent(content: string | ContentBlock[]): ContentBlock[] {
 
 function extractTextContent(blocks: ContentBlock[]): string {
   return blocks
-    .filter(b => b.type === 'text' && b.text)
-    .map(b => b.text!)
+    .filter(b => (b.type === 'text' && b.text) || (b.type === 'thinking' && b.thinking))
+    .map(b => b.type === 'thinking' ? b.thinking! : b.text!)
     .join('\n');
+}
+
+function extractToolResults(blocks: ContentBlock[]): ToolResult[] {
+  return blocks
+    .filter(b => b.type === 'tool_result' && b.tool_use_id)
+    .map(b => ({
+      toolCallId: b.tool_use_id!,
+      success: !b.is_error,
+      content: b.content || '',
+    }));
 }
 
 function extractToolCalls(blocks: ContentBlock[]): ToolCall[] {

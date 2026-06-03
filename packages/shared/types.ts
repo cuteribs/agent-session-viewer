@@ -215,13 +215,15 @@ export interface ClaudeCodeEntry {
 }
 
 export interface ContentBlock {
-  type: 'text' | 'tool_use' | 'tool_result';
+  type: 'text' | 'tool_use' | 'tool_result' | 'thinking';
   text?: string;
+  thinking?: string;
   id?: string;
   name?: string;
   input?: Record<string, unknown>;
   content?: string;
   tool_use_id?: string;
+  is_error?: boolean;
 }
 
 export interface CopilotEvent {
