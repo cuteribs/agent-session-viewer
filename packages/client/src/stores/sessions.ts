@@ -9,7 +9,7 @@ export const useSessionsStore = defineStore('sessions', () => {
   const sessions = ref<SessionSummary[]>([])
   const currentSession = ref<SessionDetail | null>(null)
   const loading = ref(false)
-  /** Separate loading flag for fetching session detail — does not hide the sidebar list */
+  /** Separate loading flag for fetching session detail 鈥?does not hide the sidebar list */
   const detailLoading = ref(false)
   const error = ref<string | null>(null)
   const sourceFilter = ref<'all' | 'claude' | 'copilot' | 'codex' | 'opencode' | 'vscode'>(
@@ -93,27 +93,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     detailLoading.value = true
     error.value = null
     try {
-      const detail = await fetchSession(source, sessionId)
-      currentSession.value = detail
-
-      // Merge full data (tokens, cost, model, messageCount) back into the list entry
-      // so sidebar badges fill in without a full list reload.
-      if (detail) {
-        const idx = sessions.value.findIndex(s => s.id === sessionId && s.source === source)
-        if (idx >= 0) {
-          sessions.value[idx] = {
-            ...sessions.value[idx],
-            project:       detail.project,
-            messageCount:  detail.messageCount,
-            totalTokens:   detail.totalTokens,
-            cost:          detail.cost,
-            model:         detail.model,
-            usedModels:    detail.usedModels,
-            subAgentCount: detail.subAgentCount,
-            tokenNote:     detail.tokenNote,
-          }
-        }
-      }
+      currentSession.value = await fetchSession(source, sessionId)
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to load session'
     } finally {
@@ -194,7 +174,7 @@ export const useSessionsStore = defineStore('sessions', () => {
       const status = await fetchWatchStatus()
       watchEnabled.value = status.active
     } catch {
-      // non-critical — watcher status unknown
+      // non-critical 鈥?watcher status unknown
     }
   }
 

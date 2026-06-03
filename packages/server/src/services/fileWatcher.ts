@@ -1,6 +1,6 @@
 import chokidar from 'chokidar';
 import { getServerConfig } from '../config.js';
-import { invalidateSession, invalidateFileListCache, getSession } from './sessionService.js';
+import { invalidateSession, getSession } from './sessionService.js';
 import { getSessionSummary, type SessionSource } from '../parsers/index.js';
 import type { WSMessage } from '../types/index.js';
 import { basename, dirname } from 'path';
@@ -65,10 +65,6 @@ function handleFileChange(
 
   // Invalidate cache
   invalidateSession(source, sessionId);
-  // For add/unlink, the file list itself changed — invalidate the per-source list cache
-  if (event === 'add' || event === 'unlink') {
-    invalidateFileListCache(source);
-  }
 
   // Determine message type and send update
   let messageType: WSMessage['type'];
