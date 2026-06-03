@@ -24,13 +24,11 @@ jobs:
       - name: Build & Pack
         run: |
           pushd packages/client
-          npm install && npm run build
+          npm install
           popd
 
           pushd packages/server
           npm install && npm run build
-          mkdir dist/public
-          cp -r ../client/dist/. ./dist/public/
           cp ../../README.md ./
           npm pack
           mkdir tar
