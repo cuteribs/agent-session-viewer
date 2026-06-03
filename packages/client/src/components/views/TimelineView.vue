@@ -65,11 +65,12 @@ function summarizeArgs(args: Record<string, unknown>): string {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div data-name="timeline-view" class="space-y-4">
     <div
       v-for="(message, index) in reversedMessages"
       :key="message.id"
       :data-message-index="index"
+      :data-name="`message-${message.role}-${index}`"
       :class="[
         'bg-primary rounded-lg shadow-sm border transition-all',
         sessionsStore.selectedMessageIndex === index
@@ -80,10 +81,11 @@ function summarizeArgs(args: Record<string, unknown>): string {
       style="cursor: pointer;"
     >
       <!-- Message header -->
-      <div class="flex items-center justify-between px-4 py-2 bg-tertiary/50">
+      <div data-name="message-header" class="flex items-center justify-between px-4 py-2 bg-tertiary/50">
         <div class="flex items-center gap-3">
-          <span class="text-xs text-muted">#{{ displayMessages.length - index }}</span>
+          <span data-name="message-number" class="text-xs text-muted">#{{ displayMessages.length - index }}</span>
           <span
+            data-name="message-role"
             :class="[
               'px-2 py-0.5 text-xs font-medium rounded text-white capitalize',
               getRoleColor(message.role)
@@ -91,13 +93,14 @@ function summarizeArgs(args: Record<string, unknown>): string {
           >
             {{ message.role }}
           </span>
-          <span v-if="message.model" class="text-xs text-muted">
+          <span v-if="message.model" data-name="message-model" class="text-xs text-muted">
             {{ message.model }}
           </span>
         </div>
         <div class="flex items-center gap-3">
           <span
             v-if="message.tokens"
+            data-name="message-token-badge"
             class="text-xs px-2 py-0.5 bg-secondary rounded"
             :title="message.tokens.estimated
               ? `~Input: ${message.tokens.input.toLocaleString()} (est. conv context), Output: ${message.tokens.output.toLocaleString()} (exact), ~Cache: ${(message.tokens.cacheRead ?? 0).toLocaleString()} (est. sys overhead)`
@@ -107,38 +110,40 @@ function summarizeArgs(args: Record<string, unknown>): string {
           </span>
           <span
             v-if="message.tokens?.cost != null && message.tokens.cost > 0"
+            data-name="message-cost-badge"
             class="text-xs px-2 py-0.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded"
             :title="message.tokens.estimated ? 'Estimated cost (input/cache estimated)' : 'Cost based on exact token counts'"
           >
             <span v-if="message.tokens.estimated" class="opacity-70">~</span>{{ formatCost(message.tokens.cost) }}
           </span>
-          <span class="text-xs text-muted">
+          <span data-name="message-time" class="text-xs text-muted">
             {{ formatTime(message.timestamp) }}
           </span>
         </div>
       </div>
 
       <!-- Message content -->
-      <div class="px-4">
-        <p v-if="message.content" class="text-sm text-primary whitespace-pre-wrap break-words py-3">
+      <div data-name="message-body" class="px-4">
+        <p v-if="message.content" data-name="message-content-text" class="text-sm text-primary whitespace-pre-wrap break-words py-3">
           {{ truncateText(message.content, 500) }}
         </p>
-        <p v-else-if="!message.toolCalls?.length && !message.toolResult" class="text-sm text-muted italic py-3">
+        <p v-else-if="!message.toolCalls?.length && !message.toolResult" data-name="message-no-content" class="text-sm text-muted italic py-3">
           (no content)
         </p>
 
         <!-- Tool calls grouped by name -->
-        <div v-if="message.toolCalls && message.toolCalls.length > 0" class="pb-3 space-y-2">
+        <div v-if="message.toolCalls && message.toolCalls.length > 0" data-name="message-tool-calls" class="pb-3 space-y-2">
           <div
             v-for="group in groupToolCalls(message.toolCalls)"
             :key="group.name"
+            :data-name="`tool-group-${group.name}`"
             class="rounded border border-yellow-200 dark:border-yellow-800 overflow-hidden"
           >
             <!-- Group header -->
-            <div class="flex items-center gap-1.5 px-2 py-1 bg-yellow-50 dark:bg-yellow-900/20">
+            <div data-name="tool-group-header" class="flex items-center gap-1.5 px-2 py-1 bg-yellow-50 dark:bg-yellow-900/20">
               <svg class="w-3 h-3 text-yellow-600 dark:text-yellow-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0a3 3 0 016 0z" />
               </svg>
               <span class="text-xs font-semibold text-yellow-800 dark:text-yellow-300">{{ group.name }}</span>
               <span v-if="group.calls.length > 1" class="text-xs text-yellow-600 dark:text-yellow-500 ml-auto">×{{ group.calls.length }}</span>
@@ -148,6 +153,7 @@ function summarizeArgs(args: Record<string, unknown>): string {
               <p
                 v-for="call in group.calls"
                 :key="call.id"
+                :data-name="`tool-call-${call.id}`"
                 class="px-2 py-1 text-xs font-mono text-secondary truncate"
                 :title="summarizeArgs(call.arguments)"
               >
@@ -158,7 +164,7 @@ function summarizeArgs(args: Record<string, unknown>): string {
         </div>
 
         <!-- Tool result indicator -->
-        <div v-if="message.toolResult" class="pb-3">
+        <div v-if="message.toolResult" data-name="message-tool-result" class="pb-3">
           <span
             :class="[
               'inline-flex items-center gap-1 px-2 py-1 text-xs rounded',

@@ -82,7 +82,7 @@ export function parseClaudeSessionFile(filePath: string): SessionDetail | null {
       const toolResults = extractToolResults(contentBlocks);
 
       // Track model
-      if (message.model && !model) {
+      if (message.model && !model && message.model !== '<synthetic>') {
         model = message.model;
       }
 
@@ -273,7 +273,7 @@ function parseClaudeSubagentFile(filePath: string): SubAgent | null {
     const agentType = entries.find(e => e.attributionAgent)?.attributionAgent ?? 'agent';
 
     // Model from first assistant message
-    const model = entries.find(e => e.type === 'assistant' && e.message?.model)?.message?.model;
+    const model = entries.find(e => e.type === 'assistant' && e.message?.model && e.message.model !== '<synthetic>')?.message?.model;
 
     // Prompt = text content of the first user message
     let prompt: string | undefined;

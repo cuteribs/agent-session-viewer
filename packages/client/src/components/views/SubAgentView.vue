@@ -105,11 +105,12 @@ function durationFormatted(ms?: number) {
 </script>
 
 <template>
-  <div class="flex flex-col h-full">
+  <div data-name="subagent-view" class="flex flex-col h-full">
     <!-- Header -->
-    <div class="bg-primary border-b border-default px-4 py-3">
+    <div data-name="subagent-header" class="bg-primary border-b border-default px-4 py-3">
       <!-- Breadcrumb -->
       <button
+        data-name="subagent-back"
         @click="emit('back')"
         class="flex items-center gap-1 text-sm text-accent hover:text-accent/80 mb-2 transition-colors"
       >
@@ -121,11 +122,12 @@ function durationFormatted(ms?: number) {
 
       <!-- Agent title -->
       <div class="flex items-center gap-2 flex-wrap">
-        <span class="text-lg font-semibold text-primary">{{ agent.agentId }}</span>
-        <span class="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+        <span data-name="subagent-id" class="text-lg font-semibold text-primary">{{ agent.agentId }}</span>
+        <span data-name="subagent-type-badge" class="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
           {{ agent.agentDisplayName || agent.agentType }}
         </span>
         <span
+          data-name="subagent-status-badge"
           class="px-2 py-0.5 text-xs font-medium rounded-full"
           :class="agent.status === 'completed'
             ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
@@ -136,27 +138,27 @@ function durationFormatted(ms?: number) {
           {{ agent.status }}
         </span>
       </div>
-      <p v-if="agent.description" class="text-sm text-muted mt-1">{{ agent.description }}</p>
+      <p v-if="agent.description" data-name="subagent-description" class="text-sm text-muted mt-1">{{ agent.description }}</p>
 
       <!-- Stats -->
-      <div class="flex items-center gap-6 mt-2 text-sm flex-wrap">
-        <div v-if="agent.model" class="flex items-center gap-1">
+      <div data-name="subagent-stats" class="flex items-center gap-6 mt-2 text-sm flex-wrap">
+        <div v-if="agent.model" data-name="subagent-stat-model" class="flex items-center gap-1">
           <span class="text-muted">Model:</span>
           <span class="font-medium">{{ agent.model }}</span>
         </div>
-        <div v-if="agent.totalTokens" class="flex items-center gap-1">
+        <div v-if="agent.totalTokens" data-name="subagent-stat-tokens" class="flex items-center gap-1">
           <span class="text-muted">Tokens:</span>
           <span class="font-medium">{{ formatTokens(agent.totalTokens) }}</span>
         </div>
-        <div v-if="agent.totalToolCalls" class="flex items-center gap-1">
+        <div v-if="agent.totalToolCalls" data-name="subagent-stat-tool-calls" class="flex items-center gap-1">
           <span class="text-muted">Tool calls:</span>
           <span class="font-medium">{{ agent.totalToolCalls }}</span>
         </div>
-        <div v-if="agent.durationMs" class="flex items-center gap-1">
+        <div v-if="agent.durationMs" data-name="subagent-stat-duration" class="flex items-center gap-1">
           <span class="text-muted">Duration:</span>
           <span class="font-medium">{{ durationFormatted(agent.durationMs) }}</span>
         </div>
-        <div v-if="agent.messages?.length" class="flex items-center gap-1">
+        <div v-if="agent.messages?.length" data-name="subagent-stat-messages" class="flex items-center gap-1">
           <span class="text-muted">Messages:</span>
           <span class="font-medium">{{ agent.messages.length }}</span>
         </div>
@@ -164,11 +166,12 @@ function durationFormatted(ms?: number) {
     </div>
 
     <!-- Tab bar -->
-    <div class="bg-primary border-b border-default px-4">
+    <div data-name="subagent-tab-nav" class="bg-primary border-b border-default px-4">
       <nav class="flex gap-1">
         <button
           v-for="tab in tabs"
           :key="tab.id"
+          :data-name="`subagent-tab-${tab.id}`"
           @click="activeTab = tab.id"
           :class="[
             'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors',
@@ -186,7 +189,7 @@ function durationFormatted(ms?: number) {
     </div>
 
     <!-- Tab content -->
-    <div class="flex-1 overflow-y-auto p-4">
+    <div data-name="subagent-tab-content" class="flex-1 overflow-y-auto p-4">
 
       <!-- Timeline tab -->
       <template v-if="activeTab === 'timeline'">

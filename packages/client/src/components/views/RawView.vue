@@ -30,25 +30,26 @@ function downloadJSON() {
 </script>
 
 <template>
-  <div>
+  <div data-name="raw-view">
     <!-- Controls -->
-    <div class="flex items-center justify-between mb-4">
+    <div data-name="raw-controls" class="flex items-center justify-between mb-4">
       <div class="flex gap-4">
-        <label class="flex items-center gap-2 text-sm text-secondary">
+        <label data-name="raw-toggle-stats" class="flex items-center gap-2 text-sm text-secondary">
           <input type="checkbox" v-model="showStats" class="rounded" />
           Show Stats
         </label>
-        <label class="flex items-center gap-2 text-sm text-secondary">
+        <label data-name="raw-toggle-messages" class="flex items-center gap-2 text-sm text-secondary">
           <input type="checkbox" v-model="showMessages" class="rounded" />
           Show Messages
         </label>
-        <label class="flex items-center gap-2 text-sm text-secondary">
+        <label data-name="raw-toggle-tool-usage" class="flex items-center gap-2 text-sm text-secondary">
           <input type="checkbox" v-model="showToolUsage" class="rounded" />
           Show Tool Usage
         </label>
       </div>
       <div class="flex gap-2">
         <button
+          data-name="raw-copy"
           @click="copyToClipboard"
           class="flex items-center gap-1 px-3 py-1.5 text-sm bg-tertiary hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
         >
@@ -58,6 +59,7 @@ function downloadJSON() {
           Copy
         </button>
         <button
+          data-name="raw-download"
           @click="downloadJSON"
           class="flex items-center gap-1 px-3 py-1.5 text-sm bg-tertiary hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
         >
@@ -70,7 +72,7 @@ function downloadJSON() {
     </div>
 
     <!-- JSON Display -->
-    <div class="bg-primary rounded-lg border border-default overflow-hidden">
+    <div data-name="raw-json-display" class="bg-primary rounded-lg border border-default overflow-hidden">
       <pre class="p-4 overflow-x-auto text-sm text-primary font-mono max-h-[calc(100vh-300px)]"><code>{{ rawData }}</code></pre>
     </div>
   </div>

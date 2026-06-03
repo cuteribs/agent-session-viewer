@@ -50,8 +50,9 @@ function cancelDelete() {
 </script>
 
 <template>
-  <div>
+  <div :data-name="`session-item-${session.source}-${session.id.substring(0,8)}`">
     <button
+      data-name="session-item-button"
       @click="handleClick"
       :class="[
         'w-full text-left px-4 py-3 hover:bg-tertiary transition-colors border-l-2 relative group',
@@ -64,24 +65,26 @@ function cancelDelete() {
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
             <span
+              data-name="session-item-source-dot"
               :class="['w-2 h-2 rounded-full flex-shrink-0', getSourceBgColor(session.source)]"
             />
-            <span class="font-medium text-primary truncate">
+            <span data-name="session-item-project" class="font-medium text-primary truncate">
               {{ truncateText(session.project, 30) }}
             </span>
           </div>
-          <p class="text-xs text-muted mt-1 truncate">
+          <p data-name="session-item-id" class="text-xs text-muted mt-1 truncate">
             {{ session.id.substring(0, 8) }}...
           </p>
         </div>
         <div class="text-right flex-shrink-0">
-          <p class="text-xs text-muted">
+          <p data-name="session-item-time" class="text-xs text-muted">
             {{ formatRelativeTime(session.lastActivity) }}
           </p>
           <div class="flex items-center gap-2 mt-1 flex-wrap justify-end">
-            <span class="text-xs text-secondary">{{ session.messageCount }} msgs</span>
+            <span data-name="session-item-msg-count" class="text-xs text-secondary">{{ session.messageCount }} msgs</span>
             <span
               v-if="!isActive && session.subAgentCount"
+              data-name="session-item-agent-count"
               class="text-xs px-1 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded"
               title="Has subagents"
             >
@@ -89,6 +92,7 @@ function cancelDelete() {
             </span>
             <span
               v-if="session.totalTokens"
+              data-name="session-item-tokens"
               class="text-xs px-1.5 py-0.5 bg-tertiary rounded"
             >
               {{ formatTokens(session.totalTokens) }}
@@ -98,6 +102,7 @@ function cancelDelete() {
       </div>
 
       <button
+        data-name="session-item-delete"
         @click.stop="handleDelete"
         class="absolute top-2 right-2 p-1 opacity-0 group-hover:opacity-100 hover:bg-red-500/20 rounded transition-all"
         title="Delete session"
@@ -110,6 +115,7 @@ function cancelDelete() {
 
     <button
       v-if="isActive && subAgents.length"
+      data-name="session-item-subagents-toggle"
       @click.stop="showSubAgents = !showSubAgents"
       class="w-full flex items-center gap-2 px-4 py-1.5 text-xs text-secondary hover:bg-tertiary border-t border-default"
     >
@@ -119,10 +125,11 @@ function cancelDelete() {
       {{ subAgents.length }} Subagent{{ subAgents.length > 1 ? 's' : '' }}
     </button>
 
-    <div v-if="isActive && showSubAgents" class="border-t border-default">
+    <div v-if="isActive && showSubAgents" data-name="session-item-subagents-list" class="border-t border-default">
       <button
         v-for="agent in subAgents"
         :key="agent.id"
+        :data-name="`subagent-${agent.id}`"
         @click.stop="sessionsStore.selectSubAgent(agent)"
         class="w-full text-left flex items-center gap-2 px-5 py-2 text-xs hover:bg-tertiary transition-colors"
         :class="sessionsStore.selectedSubAgent?.id === agent.id ? 'bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-500' : ''"
@@ -142,35 +149,38 @@ function cancelDelete() {
       <Transition name="fade">
         <div
           v-if="showDeleteConfirm"
+          data-name="delete-confirm-dialog"
           class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
           @click.self="cancelDelete"
         >
-          <div class="bg-primary rounded-lg shadow-xl w-full max-w-sm">
-            <div class="p-4 border-b border-default">
+          <div data-name="delete-confirm-card" class="bg-primary rounded-lg shadow-xl w-full max-w-sm">
+            <div data-name="delete-confirm-header" class="p-4 border-b border-default">
               <h3 class="text-lg font-semibold text-primary">Delete Session?</h3>
             </div>
 
-            <div class="p-4 space-y-2">
+            <div data-name="delete-confirm-body" class="p-4 space-y-2">
               <p class="text-sm text-secondary">
                 Are you sure you want to permanently delete this session?
               </p>
               <div class="bg-tertiary rounded-lg p-3 text-sm">
-                <p class="font-medium text-primary">{{ session.project }}</p>
-                <p class="text-xs text-muted mt-1">{{ session.projectPath }}</p>
+                <p data-name="delete-confirm-project" class="font-medium text-primary">{{ session.project }}</p>
+                <p data-name="delete-confirm-path" class="text-xs text-muted mt-1">{{ session.projectPath }}</p>
               </div>
               <p class="text-xs text-error font-medium">
                 This action cannot be undone.
               </p>
             </div>
 
-            <div class="flex items-center justify-end gap-2 px-4 py-3 border-t border-default">
+            <div data-name="delete-confirm-actions" class="flex items-center justify-end gap-2 px-4 py-3 border-t border-default">
               <button
+                data-name="delete-confirm-cancel"
                 @click="cancelDelete"
                 class="px-3 py-1.5 text-sm bg-tertiary hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
               >
                 Cancel
               </button>
               <button
+                data-name="delete-confirm-ok"
                 @click="confirmDelete"
                 class="px-3 py-1.5 text-sm bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
               >

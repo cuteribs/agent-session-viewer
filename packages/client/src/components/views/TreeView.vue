@@ -110,16 +110,18 @@ function getRoleColor(role: string): string {
 </script>
 
 <template>
-  <div>
+  <div data-name="tree-view">
     <!-- Controls -->
-    <div class="flex gap-2 mb-4">
+    <div data-name="tree-controls" class="flex gap-2 mb-4">
       <button
+        data-name="tree-expand-all"
         @click="expandAll"
         class="px-3 py-1.5 text-sm bg-tertiary hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
       >
         Expand All
       </button>
       <button
+        data-name="tree-collapse-all"
         @click="collapseAll"
         class="px-3 py-1.5 text-sm bg-tertiary hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
       >
@@ -128,10 +130,11 @@ function getRoleColor(role: string): string {
     </div>
 
     <!-- Tree -->
-    <div class="bg-primary rounded-lg border border-default p-4">
+    <div data-name="tree-nodes" class="bg-primary rounded-lg border border-default p-4">
       <div
         v-for="node in flattenedNodes"
         :key="node.message.id"
+        :data-name="`tree-node-${node.message.role}-${node.message.id.substring(0,8)}`"
         class="py-1"
         :style="{ marginLeft: node.depth * 24 + 'px' }"
       >
@@ -139,6 +142,7 @@ function getRoleColor(role: string): string {
           <!-- Expand/collapse button -->
           <button
             v-if="hasChildren(node)"
+            data-name="tree-toggle-expand"
             @click="toggleNode(node.message.id)"
             class="mt-1 p-0.5 hover:bg-tertiary rounded flex-shrink-0"
           >
@@ -155,11 +159,13 @@ function getRoleColor(role: string): string {
 
           <!-- Node content -->
           <div
+            data-name="tree-node-content"
             class="flex-1 p-2 bg-secondary rounded cursor-pointer hover:bg-tertiary transition-colors"
             @click="openPreview(node.message)"
           >
             <div class="flex items-center gap-2 text-sm">
               <span
+                data-name="tree-node-role"
                 :class="[
                   'px-1.5 py-0.5 text-xs font-medium rounded text-white capitalize',
                   getRoleColor(node.message.role)
@@ -167,10 +173,11 @@ function getRoleColor(role: string): string {
               >
                 {{ node.message.role }}
               </span>
-              <span class="text-xs text-muted">{{ node.message.id.substring(0, 8) }}...</span>
+              <span data-name="tree-node-id" class="text-xs text-muted">{{ node.message.id.substring(0, 8) }}...</span>
               <!-- Token badge -->
               <span
                 v-if="node.message.tokens"
+                data-name="tree-node-tokens"
                 class="text-xs px-1.5 py-0.5 bg-secondary rounded"
                 :title="node.message.tokens.estimated
                   ? `~Output: ${node.message.tokens.output.toLocaleString()} tokens`
@@ -178,14 +185,14 @@ function getRoleColor(role: string): string {
               >
                 <span v-if="node.message.tokens.estimated" class="text-amber-500">~</span>{{ formatTokens(node.message.tokens.input + node.message.tokens.output) }}
               </span>
-              <span v-if="node.message.toolCalls && node.message.toolCalls.length > 0" class="text-xs text-yellow-600 dark:text-yellow-400">
+              <span v-if="node.message.toolCalls && node.message.toolCalls.length > 0" data-name="tree-node-tool-count" class="text-xs text-yellow-600 dark:text-yellow-400">
                 {{ node.message.toolCalls.length }} tool call(s)
               </span>
-              <span v-if="hasChildren(node)" class="text-xs text-muted">
+              <span v-if="hasChildren(node)" data-name="tree-node-child-count" class="text-xs text-muted">
                 ({{ node.children.length }} {{ node.children.length === 1 ? 'child' : 'children' }})
               </span>
             </div>
-            <p class="text-sm text-primary mt-1 truncate">
+            <p data-name="tree-node-text" class="text-sm text-primary mt-1 truncate">
               <template v-if="node.message.content">
                 {{ node.message.content.substring(0, 100) }}{{ node.message.content.length > 100 ? '...' : '' }}
               </template>
@@ -201,7 +208,7 @@ function getRoleColor(role: string): string {
       </div>
 
       <!-- Empty state -->
-      <div v-if="flattenedNodes.length === 0" class="text-center text-muted py-8">
+      <div v-if="flattenedNodes.length === 0" data-name="tree-empty" class="text-center text-muted py-8">
         No messages in this session
       </div>
     </div>

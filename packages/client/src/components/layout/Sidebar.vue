@@ -52,13 +52,15 @@ function stopResize() {
 
 <template>
   <aside
+    data-name="sidebar"
     class="bg-primary border-r border-default flex flex-col relative"
     :style="{ width: `${sidebarWidth}px` }"
   >
     <!-- Source filter dropdown -->
-    <div class="relative border-b border-default px-3 py-2">
+    <div data-name="source-filter" class="relative border-b border-default px-3 py-2">
       <span class="text-xs text-muted mb-1 block">Agent</span>
       <button
+        data-name="source-filter-toggle"
         @click="showSourceDropdown = !showSourceDropdown"
         @blur="setTimeout(() => showSourceDropdown = false, 150)"
         class="w-full flex items-center justify-between px-3 py-1.5 text-sm rounded border border-default bg-secondary hover:bg-tertiary transition-colors"
@@ -73,12 +75,14 @@ function stopResize() {
       </button>
       <div
         v-if="showSourceDropdown"
+        data-name="source-filter-dropdown"
         @mousedown.prevent
         class="absolute top-full left-3 right-3 z-50 bg-primary border border-default rounded-lg shadow-lg py-1 mt-1"
       >
         <button
           v-for="opt in sourceOptions"
           :key="opt.value"
+          :data-name="`source-option-${opt.value}`"
           @click="selectSource(opt.value)"
           :class="[
             'w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors',
@@ -94,10 +98,11 @@ function stopResize() {
     </div>
 
     <!-- View toggle -->
-    <div class="flex items-center justify-between px-3 py-2 border-b border-default">
+    <div data-name="view-toggle" class="flex items-center justify-between px-3 py-2 border-b border-default">
       <span class="text-sm text-muted">View by:</span>
       <div class="flex gap-1">
         <button
+          data-name="view-by-date"
           @click="setListViewMode('date')"
           :class="[
             'px-2 py-1 text-xs rounded',
@@ -109,6 +114,7 @@ function stopResize() {
           Date
         </button>
         <button
+          data-name="view-by-project"
           @click="setListViewMode('project')"
           :class="[
             'px-2 py-1 text-xs rounded',
@@ -123,17 +129,18 @@ function stopResize() {
     </div>
 
     <!-- Session list -->
-    <div class="flex-1 overflow-y-auto">
+    <div data-name="session-list-container" class="flex-1 overflow-y-auto">
       <SessionList :view-mode="prefs.listViewMode" />
     </div>
 
     <!-- Stats footer -->
-    <div class="px-3 py-2 border-t border-default text-xs text-muted">
+    <div data-name="sidebar-footer" class="px-3 py-2 border-t border-default text-xs text-muted">
       {{ sessionsStore.filteredSessions.length }} sessions
     </div>
 
     <!-- Resize handle -->
     <div
+      data-name="sidebar-resize-handle"
       class="absolute top-0 right-0 w-1 h-full cursor-ew-resize hover:bg-accent/50 transition-colors"
       @mousedown="startResize"
     />

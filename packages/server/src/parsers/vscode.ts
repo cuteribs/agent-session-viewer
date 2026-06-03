@@ -600,18 +600,16 @@ function buildSession(
         lastWasInlineRef = false;
 
       } else if (!part.kind && typeof part.value === 'string') {
-        // Plain text part — skip pure code-fence delimiters that VSCode injects
-        // around file-edit blocks (they are just UI decoration, not LLM prose).
         if (/^[\s`]*$/.test(part.value)) {
           lastWasInlineRef = false;
           continue;
         }
-        // Add a paragraph break when transitioning between separate prose blocks,
-        // but NOT when flowing directly after an inline reference.
+        let text = part.value.replace(/^\[LLM MODEL ID\]\s*/m, '');
+        if (!text) { lastWasInlineRef = false; continue; }
         if (!lastWasInlineRef && content && !content.endsWith('\n')) {
           content += '\n\n';
         }
-        content += part.value;
+        content += text;
         lastWasInlineRef = false;
 
       } else if (part.kind === 'inlineReference') {
@@ -782,8 +780,10 @@ function buildSession(
             arguments: inputText ? { input: inputText } : {},
           });
         } else if (!p.kind && typeof p.value === 'string' && !/^[\s`]*$/.test(p.value)) {
+          let saText = p.value.replace(/^\[LLM MODEL ID\]\s*/m, '');
+          if (!saText) continue;
           if (saTextParts && !saTextParts.endsWith('\n')) saTextParts += '\n\n';
-          saTextParts += p.value;
+          saTextParts += saText;
         }
       }
 

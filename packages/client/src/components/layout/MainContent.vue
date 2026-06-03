@@ -31,10 +31,11 @@ function handleExport(format: 'csv' | 'json') {
 </script>
 
 <template>
-  <main class="flex-1 flex flex-col overflow-hidden bg-secondary">
+  <main data-name="main-content" class="flex-1 flex flex-col overflow-hidden bg-secondary">
     <!-- Empty state -->
     <div
       v-if="!session"
+      data-name="empty-state"
       class="flex-1 flex items-center justify-center text-muted"
     >
       <div class="text-center">
@@ -60,20 +61,21 @@ function handleExport(format: 'csv' | 'json') {
       <!-- Normal session view -->
       <template v-else>
       <!-- Session header -->
-      <div class="bg-primary border-b border-default px-4 py-3">
+      <div data-name="session-header" class="bg-primary border-b border-default px-4 py-3">
         <div class="flex items-start justify-between">
           <div>
             <div class="flex items-center gap-2">
               <span
+                data-name="source-badge"
                 :class="['px-2 py-0.5 text-xs font-medium rounded-full text-white', getSourceBgColor(session.source)]"
               >
                 {{ session.source }}
               </span>
-              <h2 class="text-lg font-semibold text-primary">{{ session.project }}</h2>
+              <h2 data-name="project-name" class="text-lg font-semibold text-primary">{{ session.project }}</h2>
             </div>
             <p class="text-sm text-muted mt-1 flex items-center gap-2">
-              <span>{{ session.projectPath }}</span>
-              <span class="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+              <span data-name="project-path">{{ session.projectPath }}</span>
+              <span data-name="session-id" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
                 <span class="opacity-70">ID</span>
                 {{ session.id }}
               </span>
@@ -81,14 +83,16 @@ function handleExport(format: 'csv' | 'json') {
           </div>
 
           <!-- Export buttons -->
-          <div class="flex gap-2">
+          <div data-name="export-buttons" class="flex gap-2">
             <button
+              data-name="export-csv"
               @click="handleExport('csv')"
               class="px-3 py-1.5 text-sm bg-tertiary hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
             >
               Export CSV
             </button>
             <button
+              data-name="export-json"
               @click="handleExport('json')"
               class="px-3 py-1.5 text-sm bg-tertiary hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
             >
@@ -98,26 +102,25 @@ function handleExport(format: 'csv' | 'json') {
         </div>
 
         <!-- Quick stats -->
-        <div class="flex items-center gap-6 mt-3 text-sm">
-          <div class="flex items-center gap-1">
+        <div data-name="quick-stats" class="flex items-center gap-6 mt-3 text-sm">
+          <div data-name="stat-messages" class="flex items-center gap-1">
             <span class="text-muted">Messages:</span>
             <span class="font-medium">{{ session.messageCount }}</span>
           </div>
-          <div v-if="session.totalTokens" class="flex items-center gap-1">
+          <div v-if="session.totalTokens" data-name="stat-tokens" class="flex items-center gap-1">
             <span class="text-muted">Tokens:</span>
             <TokenBadge :tokens="session.totalTokens" />
           </div>
           <!-- Per-model breakdown: inline for single model, dropdown for 2+ -->
           <template v-if="session.usedModels?.length === 1">
-            <div class="flex items-center gap-1">
+            <div data-name="stat-model-inline" class="flex items-center gap-1">
               <span class="text-muted">Model:</span>
               <span class="font-medium">{{ session.usedModels[0].model }}</span>
-              <TokenBadge :tokens="session.usedModels[0].totalTokens" />
-              <span v-if="session.usedModels[0].cost > 0" class="font-semibold text-green-700 dark:text-green-400 text-xs">{{ formatCost(session.usedModels[0].cost) }}</span>
             </div>
           </template>
-          <div v-else-if="session.usedModels && session.usedModels.length > 1" class="relative">
+          <div v-else-if="session.usedModels && session.usedModels.length > 1" data-name="stat-model-dropdown" class="relative">
             <button
+              data-name="models-dropdown-toggle"
               @click="showModels = !showModels"
               @blur="setTimeout(() => showModels = false, 150)"
               class="flex items-center gap-1.5 px-2 py-1 text-xs rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:opacity-80 transition-opacity"
@@ -129,6 +132,7 @@ function handleExport(format: 'csv' | 'json') {
             </button>
             <div
               v-if="showModels"
+              data-name="models-dropdown-panel"
               @mousedown.prevent
               class="absolute top-full left-0 mt-1 z-50 bg-primary border border-default rounded-lg shadow-lg p-3 min-w-[320px]"
             >
@@ -138,28 +142,23 @@ function handleExport(format: 'csv' | 'json') {
                 class="flex items-center justify-between py-1.5 first:pt-0 last:pb-0 border-b border-default last:border-0 text-xs"
               >
                 <span class="font-medium text-primary pr-3">{{ m.model }}</span>
-                <div class="flex items-center gap-3 text-muted">
-                  <span :title="`${m.requestCount} API requests`">{{ m.requestCount }} req</span>
-                  <TokenBadge :tokens="m.totalTokens" />
-                  <span v-if="m.cost > 0" class="text-green-600 dark:text-green-400 font-medium">{{ formatCost(m.cost) }}</span>
-                </div>
               </div>
             </div>
           </div>
-          <div v-else-if="session.model" class="flex items-center gap-1">
+          <div v-else-if="session.model" data-name="stat-model-simple" class="flex items-center gap-1">
             <span class="text-muted">Model:</span>
             <span class="font-medium">{{ session.model }}</span>
           </div>
-          <div class="flex items-center gap-1">
+          <div data-name="stat-duration" class="flex items-center gap-1">
             <span class="text-muted">Duration:</span>
             <span class="font-medium">{{ formatDuration(session.stats.duration) }}</span>
           </div>
-          <div class="flex items-center gap-1">
+          <div data-name="stat-started" class="flex items-center gap-1">
             <span class="text-muted">Started:</span>
             <span class="font-medium">{{ formatDateTime(session.startTime) }}</span>
           </div>
           <!-- Session cost subtotal -->
-          <div v-if="session.stats.tokens?.totalCost != null && session.stats.tokens.totalCost > 0" class="flex items-center gap-1">
+          <div v-if="session.stats.tokens?.totalCost != null && session.stats.tokens.totalCost > 0" data-name="stat-cost" class="flex items-center gap-1">
             <span class="text-muted">Cost:</span>
             <span class="font-semibold text-green-700 dark:text-green-400">
               {{ formatCost(session.stats.tokens.totalCost) }}
@@ -170,6 +169,7 @@ function handleExport(format: 'csv' | 'json') {
         <!-- Token data provenance note (shown when debug logs unavailable) -->
         <div
           v-if="session.tokenNote"
+          data-name="token-note"
           class="mt-2 flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400"
         >
           <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -179,13 +179,14 @@ function handleExport(format: 'csv' | 'json') {
           <span>{{ session.tokenNote }}</span>
           <a
             v-if="session.source === 'vscode'"
+            data-name="token-note-debug-logs-link"
             href="https://code.visualstudio.com/docs/agents/agent-troubleshooting/chat-debug-view"
             target="_blank"
             rel="noopener"
             class="inline-flex items-center gap-0.5 underline decoration-amber-400 hover:decoration-amber-600 dark:decoration-amber-600 dark:hover:decoration-amber-400 transition-colors"
             title="Enable github.copilot.chat.agentDebugLog.fileLogging.enabled in VS Code settings for exact token data"
           >
-            <strong>How to enable debug logs</strong>
+            How to enable debug logs
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
             </svg>
@@ -194,11 +195,12 @@ function handleExport(format: 'csv' | 'json') {
       </div>
 
       <!-- Tab navigation -->
-      <div class="bg-primary border-b border-default px-4">
+      <div data-name="tab-nav" class="bg-primary border-b border-default px-4">
         <nav class="flex gap-1">
           <button
             v-for="tab in tabs"
             :key="tab.id"
+            :data-name="`tab-${tab.id}`"
             @click="sessionsStore.setActiveView(tab.id)"
             :class="[
               'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors',
@@ -216,7 +218,7 @@ function handleExport(format: 'csv' | 'json') {
       </div>
 
       <!-- Tab content -->
-      <div class="flex-1 overflow-y-auto p-4">
+      <div data-name="tab-content" class="flex-1 overflow-y-auto p-4">
         <TimelineView v-if="sessionsStore.activeView === 'timeline'" :session="session" />
         <ChartsView v-else-if="sessionsStore.activeView === 'charts'" :session="session" />
         <TreeView v-else-if="sessionsStore.activeView === 'tree'" :session="session" />
