@@ -23,19 +23,19 @@ jobs:
 
       - name: Build & Pack
         run: |
-          cd packages/server
+          pushd packages/client
+          npm install && npm run build
+          popd
+
+          pushd packages/server
           npm install && npm run build
           mkdir dist/public
-
-          cd ../client
-          npm install && npm run build
-          cp -r dist/. ../server/dist/public/
-
-          cd ../server
+          cp -r ../client/dist/. ./dist/public/
           cp ../../README.md ./
           npm pack
           mkdir tar
           cp ./cuteribs-agent-session-viewer-* tar/
+          popd
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
