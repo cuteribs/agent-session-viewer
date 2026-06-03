@@ -849,7 +849,7 @@ function buildSession(
 
   // Token data provenance note — present when debug logs were unavailable
   const tokenNote = hasTokens && !debugTokens
-    ? 'Approximate (session log only): input = last LLM round per turn; cached and subagent tokens not included.'
+    ? 'Approximate (session log only): input = last LLM round per turn; cached and subagent tokens not included. Enable debug logs for exact data.'
     : undefined;
 
   let usedModels: UsedModelEntry[] | undefined;
