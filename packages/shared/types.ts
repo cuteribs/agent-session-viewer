@@ -415,6 +415,8 @@ export interface ToolCall {
   id: string;
   name: string;
   arguments: Record<string, unknown>;
+  /** Tool execution result/output (when available from logs) */
+  result?: string;
 }
 
 export interface ToolResult {

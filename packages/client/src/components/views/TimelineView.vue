@@ -14,11 +14,6 @@ const sessionsStore = useSessionsStore()
 
 const displayMessages = computed(() => props.messages ?? props.session?.messages ?? [])
 
-// Reverse messages for display (newest first)
-const reversedMessages = computed(() => {
-  return [...displayMessages.value].reverse()
-})
-
 // Scroll to selected message when selectedMessageIndex changes
 watch(() => sessionsStore.selectedMessageIndex, async (newIndex) => {
   if (newIndex !== null && newIndex >= 0 && newIndex < displayMessages.value.length) {
@@ -67,7 +62,7 @@ function summarizeArgs(args: Record<string, unknown>): string {
 <template>
   <div data-name="timeline-view" class="space-y-4">
     <div
-      v-for="(message, index) in reversedMessages"
+      v-for="(message, index) in displayMessages"
       :key="message.id"
       :data-message-index="index"
       :data-name="`message-${message.role}-${index}`"
@@ -83,7 +78,7 @@ function summarizeArgs(args: Record<string, unknown>): string {
       <!-- Message header -->
       <div data-name="message-header" class="flex items-center justify-between px-4 py-2 bg-tertiary/50">
         <div class="flex items-center gap-3">
-          <span data-name="message-number" class="text-xs text-muted">#{{ displayMessages.length - index }}</span>
+          <span data-name="message-number" class="text-xs text-muted">#{{ index + 1 }}</span>
           <span
             data-name="message-role"
             :class="[
@@ -148,7 +143,7 @@ function summarizeArgs(args: Record<string, unknown>): string {
               <span class="text-xs font-semibold text-yellow-800 dark:text-yellow-300">{{ group.name }}</span>
               <span v-if="group.calls.length > 1" class="text-xs text-yellow-600 dark:text-yellow-500 ml-auto">×{{ group.calls.length }}</span>
             </div>
-            <!-- Each call's argument summary -->
+            <!-- Each call's argument summary (input only; full input+result in preview modal) -->
             <div class="divide-y divide-yellow-100 dark:divide-yellow-900/30">
               <p
                 v-for="call in group.calls"

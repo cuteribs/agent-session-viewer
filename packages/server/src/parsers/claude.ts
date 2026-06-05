@@ -8,6 +8,7 @@ import type {
   SubAgent,
   Message,
   ToolCall,
+  ToolResult,
   SessionStats,
   ToolUsageSummary,
 } from '../types/index.js';
