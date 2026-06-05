@@ -380,6 +380,13 @@ export interface SessionDetail extends SessionSummary {
   stats: SessionStats;
   toolUsage: ToolUsageSummary[];
   subAgents?: SubAgent[];
+  /**
+   * Absolute path to the original raw log file backing this session.
+   * For OpenCode DB-backed sessions this is a `db::<id>` sentinel (no real file).
+   */
+  logFilePath?: string;
+  /** True when a downloadable raw log file exists on disk (false for DB-backed sessions). */
+  logAvailable?: boolean;
 }
 
 export interface Message {

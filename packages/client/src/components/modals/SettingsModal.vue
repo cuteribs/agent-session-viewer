@@ -1,14 +1,17 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useSessionsStore } from '@/stores/sessions'
 import { useConfigStore } from '@/stores/config'
 import { useTheme } from '@/composables/useTheme'
+import { fetchVersion } from '@/utils/api'
 
 const sessionsStore = useSessionsStore()
 const configStore = useConfigStore()
 const { theme, setTheme } = useTheme()
 
 const isOpen = computed(() => sessionsStore.showSettings)
+
+const appVersion = ref<string | null>(null)
 
 function close() {
   sessionsStore.closeSettings()
@@ -24,6 +27,9 @@ onMounted(() => {
   document.addEventListener('keydown', handleKeydown)
   configStore.loadConfig()
   configStore.loadPaths()
+  fetchVersion()
+    .then((v) => { appVersion.value = v.version })
+    .catch(() => { appVersion.value = null })
 })
 
 onUnmounted(() => {
@@ -166,9 +172,9 @@ onUnmounted(() => {
             <div>
               <h3 class="text-sm font-medium text-primary mb-3">About</h3>
               <div class="text-sm text-secondary space-y-1">
-                <p>Agent Session Viewer v1.0.0</p>
+                <p>Agent Session Viewer <span v-if="appVersion">v{{ appVersion }}</span><span v-else class="text-muted">(loading…)</span></p>
                 <p class="text-xs text-muted">
-                  Analyze and visualize Claude Code, Copilot CLI, Codex, and OpenCode sessions.
+                  Analyze and visualize Claude Code, Copilot CLI, Codex, OpenCode, and VS Code sessions.
                 </p>
               </div>
             </div>

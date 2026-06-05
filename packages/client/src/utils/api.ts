@@ -73,6 +73,19 @@ export function getExportURL(
   return `${API_BASE}/export/${source}/${sessionId}?format=${format}`;
 }
 
+// Raw log file download URL
+export function getLogFileURL(
+  source: 'claude' | 'copilot' | 'codex' | 'opencode' | 'vscode',
+  sessionId: string
+) {
+  return `${API_BASE}/sessions/${source}/${sessionId}/logfile`;
+}
+
+// App version
+export async function fetchVersion() {
+  return fetchJSON<{ name: string; version: string }>('/version');
+}
+
 // Session deletion
 export async function deleteSession(source: 'claude' | 'copilot' | 'codex' | 'opencode' | 'vscode', sessionId: string) {
   return fetchJSON<{ success: boolean; message: string }>(

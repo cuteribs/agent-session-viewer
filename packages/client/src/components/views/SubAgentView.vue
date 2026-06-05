@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import type { SubAgent, SessionDetail } from '@/types'
+import { ref, toRef } from 'vue'
+import type { SubAgent } from '@/types'
 import { formatDuration, formatTokens } from '@/utils/formatters'
+import { useSubAgentViewModel } from '@/composables/useSubAgentViewModel'
 import TimelineView from '@/components/views/TimelineView.vue'
 import TreeView from '@/components/views/TreeView.vue'
 import ChartsView from '@/components/views/ChartsView.vue'
-import RawView from '@/components/views/RawView.vue'
 
 const props = defineProps<{
   agent: SubAgent
@@ -16,87 +16,22 @@ const emit = defineEmits<{
   back: []
 }>()
 
-type TabId = 'timeline' | 'tree' | 'charts' | 'raw'
+type TabId = 'timeline' | 'tree' | 'charts'
 
 const tabs: { id: TabId; label: string; icon: string }[] = [
   { id: 'timeline', label: 'Timeline', icon: 'M4 6h16M4 12h16M4 18h16' },
   { id: 'tree',     label: 'Tree',     icon: 'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z' },
   { id: 'charts',   label: 'Charts',   icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-  { id: 'raw',      label: 'Raw',      icon: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4' },
 ]
 
 const activeTab = ref<TabId>('timeline')
 
-/**
- * Wrap the subagent's data into a minimal SessionDetail so Charts / Raw
- * views (which expect a full session) work out of the box.
- */
-const subAgentSession = computed((): SessionDetail => {
-  const msgs = props.agent.messages ?? []
-  const assistantMsgs = msgs.filter(m => m.role === 'assistant' && m.tokens)
+// Normalize the subagent into a viewmodel: input prompt, result, entries, and a
+// SessionDetail-shaped object for the Charts view.
+const { inputPrompt, result, session: subAgentSession } = useSubAgentViewModel(toRef(props, 'agent'))
 
-  // Use effective input = raw input + cacheCreation (new context the model processed)
-  const inputPerMessage = assistantMsgs.map(m =>
-    (m.tokens!.input || 0) + (m.tokens!.cacheCreation || 0)
-  )
-  const outputPerMessage = assistantMsgs.map(m => m.tokens!.output)
-  const totalInput = inputPerMessage.reduce((a, b) => a + b, 0)
-  const totalOutput = outputPerMessage.reduce((a, b) => a + b, 0)
-  const totalCacheRead = assistantMsgs.reduce((a, m) => a + (m.tokens!.cacheRead || 0), 0)
-  const totalCacheCreation = assistantMsgs.reduce((a, m) => a + (m.tokens!.cacheCreation || 0), 0)
-  const totalCost = assistantMsgs.reduce((a, m) => a + (m.tokens!.cost || 0), 0)
-
-  let cumulative = 0
-  const cumulativeTokens = inputPerMessage.map((inp, i) => {
-    cumulative += inp + (outputPerMessage[i] || 0)
-    return cumulative
-  })
-
-  // Build tool usage from message toolCalls
-  const toolUsageMap = new Map<string, number>()
-  for (const msg of msgs) {
-    if (msg.toolCalls) {
-      for (const tc of msg.toolCalls) {
-        toolUsageMap.set(tc.name, (toolUsageMap.get(tc.name) ?? 0) + 1)
-      }
-    }
-  }
-  const toolUsage = Array.from(toolUsageMap.entries()).map(([name, count]) => ({
-    name, count, successRate: 1,
-  }))
-
-  return {
-    id: props.agent.id,
-    source: 'opencode',
-    project: props.agent.agentDisplayName || props.agent.agentId,
-    projectPath: '',
-    startTime: props.agent.startTime,
-    lastActivity: props.agent.endTime ?? props.agent.startTime,
-    messageCount: msgs.length,
-    totalTokens: props.agent.totalTokens,
-    model: props.agent.model,
-    messages: msgs,
-    stats: {
-      messageCount: msgs.length,
-      userMessages: msgs.filter(m => m.role === 'user').length,
-      assistantMessages: msgs.filter(m => m.role === 'assistant').length,
-      duration: props.agent.durationMs ?? 0,
-      tokens: assistantMsgs.length > 0 ? {
-        totalInput,
-        totalOutput,
-        totalCacheRead,
-        totalCacheCreation,
-        totalCost,
-        inputPerMessage,
-        outputPerMessage,
-        cumulativeTokens,
-      } : undefined,
-      tools: toolUsage,
-    },
-    toolUsage,
-    subAgents: undefined,
-  }
-})
+const showInput = ref(true)
+const showResult = ref(true)
 
 function durationFormatted(ms?: number) {
   if (!ms) return ''
@@ -165,6 +100,47 @@ function durationFormatted(ms?: number) {
       </div>
     </div>
 
+    <!-- Input / Result panels -->
+    <div data-name="subagent-io" class="bg-primary border-b border-default px-4 py-3 space-y-3">
+      <!-- Input (prompt) -->
+      <div v-if="inputPrompt" data-name="subagent-input">
+        <button
+          data-name="subagent-input-toggle"
+          @click="showInput = !showInput"
+          class="flex items-center gap-1.5 text-xs font-semibold text-muted uppercase tracking-wide hover:text-primary transition-colors"
+        >
+          <svg :class="['w-3 h-3 transition-transform', showInput ? 'rotate-90' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+          Input
+        </button>
+        <pre
+          v-if="showInput"
+          data-name="subagent-input-text"
+          class="mt-1.5 p-3 bg-tertiary rounded text-sm text-primary whitespace-pre-wrap break-words max-h-60 overflow-y-auto font-mono"
+        >{{ inputPrompt }}</pre>
+      </div>
+
+      <!-- Result -->
+      <div v-if="result" data-name="subagent-result">
+        <button
+          data-name="subagent-result-toggle"
+          @click="showResult = !showResult"
+          class="flex items-center gap-1.5 text-xs font-semibold text-muted uppercase tracking-wide hover:text-primary transition-colors"
+        >
+          <svg :class="['w-3 h-3 transition-transform', showResult ? 'rotate-90' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+          Result
+        </button>
+        <pre
+          v-if="showResult"
+          data-name="subagent-result-text"
+          class="mt-1.5 p-3 bg-green-50 dark:bg-green-900/15 border border-green-200 dark:border-green-800 rounded text-sm text-primary whitespace-pre-wrap break-words max-h-60 overflow-y-auto font-mono"
+        >{{ result }}</pre>
+      </div>
+    </div>
+
     <!-- Tab bar -->
     <div data-name="subagent-tab-nav" class="bg-primary border-b border-default px-4">
       <nav class="flex gap-1">
@@ -204,11 +180,6 @@ function durationFormatted(ms?: number) {
       <!-- Charts tab -->
       <template v-else-if="activeTab === 'charts'">
         <ChartsView :session="subAgentSession" />
-      </template>
-
-      <!-- Raw tab -->
-      <template v-else-if="activeTab === 'raw'">
-        <RawView :session="subAgentSession" />
       </template>
 
     </div>

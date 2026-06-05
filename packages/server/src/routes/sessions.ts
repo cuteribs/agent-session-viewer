@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { existsSync, rmSync, unlinkSync } from 'fs';
-import { dirname, basename, join } from 'path';
+import { dirname, basename, extname, join } from 'path';
 import {
   listSessions,
   getSession,
@@ -91,6 +91,54 @@ sessionsRouter.get('/:source/:sessionId/stats', (req, res) => {
   } catch (error) {
     console.error('Error getting session stats:', error);
     res.status(500).json({ error: 'Internal server error', message: 'Failed to get stats' });
+  }
+});
+
+// GET /api/sessions/:source/:sessionId/logfile - Download the raw log file
+sessionsRouter.get('/:source/:sessionId/logfile', (req, res) => {
+  try {
+    const { source, sessionId } = req.params;
+
+    if (source !== 'claude' && source !== 'copilot' && source !== 'codex' && source !== 'opencode' && source !== 'vscode') {
+      res.status(400).json({ error: 'Bad request', message: 'Invalid source. Must be "claude", "copilot", "codex", "opencode", or "vscode"' });
+      return;
+    }
+
+    const files = findSessionFiles(source as SessionSource);
+    const filePath = files.get(sessionId);
+
+    if (!filePath) {
+      res.status(404).json({ error: 'Not found', message: 'Session not found' });
+      return;
+    }
+
+    // OpenCode DB-backed sessions have no raw file on disk.
+    if (filePath.startsWith('db::')) {
+      res.status(409).json({
+        error: 'No raw file',
+        message: 'This session is stored in the OpenCode SQLite database and has no raw log file. Use Export JSON instead.',
+      });
+      return;
+    }
+
+    if (!existsSync(filePath)) {
+      res.status(404).json({ error: 'Not found', message: 'Raw log file no longer exists on disk' });
+      return;
+    }
+
+    const ext = extname(filePath) || '.log';
+    const downloadName = `${source}-${sessionId}${ext}`;
+    res.download(filePath, downloadName, (err) => {
+      if (err && !res.headersSent) {
+        console.error(`Failed to send log file for ${sessionId}:`, err);
+        res.status(500).json({ error: 'Internal server error', message: 'Failed to send log file' });
+      }
+    });
+  } catch (error) {
+    console.error('Error downloading log file:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal server error', message: 'Failed to download log file' });
+    }
   }
 });
 
