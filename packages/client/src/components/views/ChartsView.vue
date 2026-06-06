@@ -36,7 +36,36 @@ const props = defineProps<{
 
 const sessionsStore = useSessionsStore()
 
-const chartOptions = {
+interface TokenChartPoint {
+  messageIndex: number
+  label: string
+  input: number
+  output: number
+  cumulative: number
+}
+
+const tokenChartPoints = computed((): TokenChartPoint[] => {
+  let cumulative = 0
+
+  return props.session.messages
+    .map((message, messageIndex) => ({ message, messageIndex }))
+    .filter(({ message }) => !!message.tokens)
+    .map(({ message, messageIndex }) => {
+      const input = message.tokens?.input ?? 0
+      const output = message.tokens?.output ?? 0
+      cumulative += input + output
+
+      return {
+        messageIndex,
+        label: `#${messageIndex + 1}`,
+        input,
+        output,
+        cumulative,
+      }
+    })
+})
+
+const tokenChartOptions = {
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
@@ -45,29 +74,40 @@ const chartOptions = {
     },
   },
   onClick: (event: ChartEvent, elements: ActiveElement[]) => {
-    if (elements.length > 0 && elements[0].datasetIndex === 0) {
-      const messageIndex = elements[0].index
+    if (elements.length > 0) {
+      const point = tokenChartPoints.value[elements[0].index]
+      if (!point) {
+        return
+      }
+
+      const messageIndex = point.messageIndex
       sessionsStore.selectMessageByIndex(messageIndex)
-      console.log(`Clicked message index: ${messageIndex}`)
     }
+  },
+}
+
+const barChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: 'top' as const,
+    },
   },
 }
 
 // Token usage over time chart
 const tokenChartData = computed(() => {
-  const stats = props.session.stats
-  if (!stats.tokens) {
+  if (tokenChartPoints.value.length === 0) {
     return null
   }
 
-  const labels = stats.tokens.inputPerMessage.map((_, i) => `Msg ${i + 1}`)
-
   return {
-    labels,
+    labels: tokenChartPoints.value.map(point => point.label),
     datasets: [
       {
         label: 'Input Tokens',
-        data: stats.tokens.inputPerMessage,
+        data: tokenChartPoints.value.map(point => point.input),
         borderColor: 'rgb(59, 130, 246)',
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
         fill: true,
@@ -75,7 +115,7 @@ const tokenChartData = computed(() => {
       },
       {
         label: 'Output Tokens',
-        data: stats.tokens.outputPerMessage,
+        data: tokenChartPoints.value.map(point => point.output),
         borderColor: 'rgb(16, 185, 129)',
         backgroundColor: 'rgba(16, 185, 129, 0.1)',
         fill: true,
@@ -87,19 +127,16 @@ const tokenChartData = computed(() => {
 
 // Cumulative tokens chart
 const cumulativeChartData = computed(() => {
-  const stats = props.session.stats
-  if (!stats.tokens) {
+  if (tokenChartPoints.value.length === 0) {
     return null
   }
 
-  const labels = stats.tokens.cumulativeTokens.map((_, i) => `Msg ${i + 1}`)
-
   return {
-    labels,
+    labels: tokenChartPoints.value.map(point => point.label),
     datasets: [
       {
         label: 'Cumulative Tokens',
-        data: stats.tokens.cumulativeTokens,
+        data: tokenChartPoints.value.map(point => point.cumulative),
         borderColor: 'rgb(139, 92, 246)',
         backgroundColor: 'rgba(139, 92, 246, 0.2)',
         fill: true,
@@ -279,7 +316,7 @@ function formatTime(timestamp: string): string {
     <div v-if="tokenChartData" data-name="chart-token-usage" class="bg-primary rounded-lg p-4 border border-default">
       <h3 class="text-lg font-semibold mb-4 text-primary">Token Usage Per Message</h3>
       <div class="h-64">
-        <Line :data="tokenChartData" :options="chartOptions" />
+        <Line :data="tokenChartData" :options="tokenChartOptions" />
       </div>
     </div>
 
@@ -287,7 +324,7 @@ function formatTime(timestamp: string): string {
     <div v-if="cumulativeChartData" data-name="chart-cumulative-tokens" class="bg-primary rounded-lg p-4 border border-default">
       <h3 class="text-lg font-semibold mb-4 text-primary">Cumulative Token Usage</h3>
       <div class="h-64">
-        <Line :data="cumulativeChartData" :options="chartOptions" />
+        <Line :data="cumulativeChartData" :options="tokenChartOptions" />
       </div>
     </div>
 
@@ -296,7 +333,7 @@ function formatTime(timestamp: string): string {
       <div v-if="toolChartData" data-name="chart-tool-usage" class="bg-primary rounded-lg p-4 border border-default">
         <h3 class="text-lg font-semibold mb-4 text-primary">Tool Usage</h3>
         <div class="h-64">
-          <Bar :data="toolChartData" :options="chartOptions" />
+          <Bar :data="toolChartData" :options="barChartOptions" />
         </div>
       </div>
 

@@ -3,7 +3,7 @@ import type { SessionDetail, SubAgent, Message } from '@/types'
 
 /**
  * Normalizes a SubAgent into the same shape the common views
- * (TimelineView / TreeView / ChartsView) already consume.
+ * (TimelineView / ChartsView) already consume.
  *
  * Semantics (per product decision):
  *  - The MAIN session viewmodel shows a subagent only as the invoking tool call

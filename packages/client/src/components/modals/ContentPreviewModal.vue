@@ -197,7 +197,7 @@ onUnmounted(() => {
 
           <!-- Content -->
           <div class="flex-1 overflow-y-auto p-4">
-            <div v-if="message?.content" class="message-content whitespace-pre-wrap break-words text-primary">
+            <div v-if="message?.content" data-name="message-content" class="message-content whitespace-pre-wrap break-words text-primary font-mono">
               {{ message.content }}
             </div>
             <div v-else-if="!message?.toolCalls?.length && !message?.toolResult" class="text-muted text-sm italic">

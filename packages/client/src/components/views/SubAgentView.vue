@@ -4,7 +4,6 @@ import type { SubAgent } from '@/types'
 import { formatDuration, formatTokens } from '@/utils/formatters'
 import { useSubAgentViewModel } from '@/composables/useSubAgentViewModel'
 import TimelineView from '@/components/views/TimelineView.vue'
-import TreeView from '@/components/views/TreeView.vue'
 import ChartsView from '@/components/views/ChartsView.vue'
 
 const props = defineProps<{
@@ -16,11 +15,10 @@ const emit = defineEmits<{
   back: []
 }>()
 
-type TabId = 'timeline' | 'tree' | 'charts'
+type TabId = 'timeline' | 'charts'
 
 const tabs: { id: TabId; label: string; icon: string }[] = [
   { id: 'timeline', label: 'Timeline', icon: 'M4 6h16M4 12h16M4 18h16' },
-  { id: 'tree',     label: 'Tree',     icon: 'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z' },
   { id: 'charts',   label: 'Charts',   icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
 ]
 
@@ -170,11 +168,6 @@ function durationFormatted(ms?: number) {
       <!-- Timeline tab -->
       <template v-if="activeTab === 'timeline'">
         <TimelineView :messages="agent.messages" />
-      </template>
-
-      <!-- Tree tab -->
-      <template v-else-if="activeTab === 'tree'">
-        <TreeView :messages="agent.messages" />
       </template>
 
       <!-- Charts tab -->

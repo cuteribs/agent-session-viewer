@@ -5,7 +5,6 @@ import { formatDateTime, formatDuration, formatCost, getSourceBgColor } from '@/
 import { getExportURL } from '@/utils/api'
 import TimelineView from '@/components/views/TimelineView.vue'
 import ChartsView from '@/components/views/ChartsView.vue'
-import TreeView from '@/components/views/TreeView.vue'
 import LogFileView from '@/components/views/LogFileView.vue'
 import SubAgentView from '@/components/views/SubAgentView.vue'
 import TokenBadge from '@/components/common/TokenBadge.vue'
@@ -15,7 +14,6 @@ const sessionsStore = useSessionsStore()
 const tabs = [
   { id: 'timeline', label: 'Timeline', icon: 'M4 6h16M4 12h16M4 18h16' },
   { id: 'charts', label: 'Charts', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-  { id: 'tree', label: 'Tree', icon: 'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z' },
   { id: 'logfile', label: 'Log File', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
 ] as const
 
@@ -221,7 +219,6 @@ function handleExport(format: 'csv' | 'json') {
       <div data-name="tab-content" class="flex-1 overflow-y-auto p-4">
         <TimelineView v-if="sessionsStore.activeView === 'timeline'" :session="session" />
         <ChartsView v-else-if="sessionsStore.activeView === 'charts'" :session="session" />
-        <TreeView v-else-if="sessionsStore.activeView === 'tree'" :session="session" />
         <LogFileView v-else-if="sessionsStore.activeView === 'logfile'" :session="session" />
       </div>
       </template><!-- end v-else (no subagent selected) -->
