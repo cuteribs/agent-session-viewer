@@ -14,6 +14,6 @@ export type {
 } from 'shared/types'
 
 // Client-specific types
-export type ViewMode = 'timeline' | 'charts' | 'tree' | 'raw'
+export type ViewMode = 'timeline' | 'charts' | 'logfile'
 export type ListViewMode = 'date' | 'project'
 export type Theme = 'light' | 'dark' | 'system'

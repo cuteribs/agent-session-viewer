@@ -120,6 +120,122 @@ function readDebugLogTokens(
   return { perRequest, perSubagent };
 }
 
+// ════════════════════════════════════════════════════════
+// Read tool-call args + results from debug logs
+// ════════════════════════════════════════════════════════
+// The chatSessions log records tool invocations but often leaves
+// invocationMessage empty and never stores the result. The debug-log
+// `tool_call` spans carry both `args` (input) and `result` (output).
+// We index them per tool name as FIFO queues (chronological), so the
+// nth invocation of a tool in the session log maps to the nth span.
+
+interface DebugToolCall {
+  name: string;
+  /** Raw JSON-string of the tool arguments */
+  args: string;
+  /** Raw result string (may itself be JSON) */
+  result: string;
+  ts: number;
+}
+
+interface DebugToolCalls {
+  /** Main-agent tool calls, keyed by tool name → chronological queue */
+  main: Map<string, DebugToolCall[]>;
+  /** Subagent tool calls, keyed by subagent toolCallId → (tool name → queue) */
+  perSubagent: Map<string, Map<string, DebugToolCall[]>>;
+}
+
+function parseDebugToolCallFile(filePath: string): Map<string, DebugToolCall[]> {
+  const byName = new Map<string, DebugToolCall[]>();
+  if (!existsSync(filePath)) return byName;
+  const spans: DebugToolCall[] = [];
+  for (const line of readFileSync(filePath, 'utf-8').split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const ev = JSON.parse(line) as Record<string, unknown>;
+      if (ev.type === 'tool_call' && ev.name) {
+        const a = (ev.attrs ?? {}) as Record<string, unknown>;
+        const toStr = (v: unknown): string =>
+          v == null ? '' : typeof v === 'string' ? v : JSON.stringify(v);
+        spans.push({
+          name: String(ev.name),
+          args: toStr(a.args),
+          result: toStr(a.result),
+          ts: Number(ev.ts ?? 0),
+        });
+      }
+    } catch { /* skip malformed lines */ }
+  }
+  spans.sort((x, y) => x.ts - y.ts);
+  for (const s of spans) {
+    const arr = byName.get(s.name) ?? [];
+    arr.push(s);
+    byName.set(s.name, arr);
+  }
+  return byName;
+}
+
+function readDebugLogToolCalls(
+  sessionId: string,
+  chatSessionsPath: string,
+): DebugToolCalls {
+  const result: DebugToolCalls = { main: new Map(), perSubagent: new Map() };
+  const chatSessionsDir = dirname(chatSessionsPath);
+  const workspaceDir    = dirname(chatSessionsDir);
+  const debugLogDir     = join(workspaceDir, 'GitHub.copilot-chat', 'debug-logs', sessionId);
+  if (!existsSync(debugLogDir)) return result;
+
+  result.main = parseDebugToolCallFile(join(debugLogDir, 'main.jsonl'));
+
+  let files: string[] = [];
+  try { files = readdirSync(debugLogDir); } catch { /* ignore */ }
+  for (const fname of files) {
+    const m = fname.match(/^runSubagent-default-(call_.+)\.jsonl$/);
+    if (!m) continue;
+    result.perSubagent.set(m[1], parseDebugToolCallFile(join(debugLogDir, fname)));
+  }
+  return result;
+}
+
+/**
+ * The chatSessions log uses public tool IDs (e.g. `copilot_readFile`) while the
+ * debug log records the internal implementation name (e.g. `read_file`).
+ * Map the public ID to its debug-log counterpart so args/results line up.
+ */
+const DEBUG_TOOL_NAME_ALIASES: Record<string, string> = {
+  copilot_readFile: 'read_file',
+  copilot_findTextInFiles: 'grep_search',
+  copilot_findFiles: 'file_search',
+  copilot_listDirectory: 'list_dir',
+  copilot_applyPatch: 'apply_patch',
+  copilot_fetchWebPage: 'fetch_webpage',
+  vscode_fetchWebPage_internal: 'fetch_webpage',
+};
+
+/**
+ * Pop the next debug tool-call span for `name` from a per-name queue and
+ * return parsed arguments + result. Returns undefined when none remain.
+ */
+function consumeDebugToolCall(
+  queues: Map<string, DebugToolCall[]> | undefined,
+  name: string,
+): { arguments?: Record<string, unknown>; result?: string } | undefined {
+  const debugName = DEBUG_TOOL_NAME_ALIASES[name] ?? name;
+  const q = queues?.get(debugName);
+  if (!q || q.length === 0) return undefined;
+  const span = q.shift()!;
+  let args: Record<string, unknown> | undefined;
+  if (span.args) {
+    try {
+      const parsed = JSON.parse(span.args);
+      args = typeof parsed === 'object' && parsed !== null ? parsed : { input: span.args };
+    } catch {
+      args = { input: span.args };
+    }
+  }
+  return { arguments: args, result: span.result || undefined };
+}
+
 // ── JSONL format types ──────────────────────────────────
 interface JsonlEvent {
   kind: 0 | 1 | 2;
@@ -258,9 +374,9 @@ function parseJsonlLines(lines: string[]): VSCodeState {
         state = evt.v as VSCodeState;
         if (!state.requests) state.requests = [];
       } else if (evt.kind === 1 && evt.k) {
-        setPath(state, evt.k, evt.v);
+        setPath(state as unknown as Record<string, unknown>, evt.k, evt.v);
       } else if (evt.kind === 2 && evt.k) {
-        pushPath(state, evt.k, evt.v);
+        pushPath(state as unknown as Record<string, unknown>, evt.k, evt.v);
       }
     } catch {
       // skip malformed lines
@@ -513,6 +629,9 @@ function buildSession(
   const requestTimestamps = parsedRequests.map(r => r.timestamp);
   const debugTokens = readDebugLogTokens(sessionId, sourcePath, requestTimestamps);
 
+  // ── Debug-log tool-call args + results (session log lacks both) ──
+  const debugToolCalls = readDebugLogToolCalls(sessionId, sourcePath);
+
   let reqIdx = -1;
   for (const req of parsedRequests) {
     if (!req.userText && !req.responseParts.length) continue;
@@ -588,10 +707,18 @@ function buildSession(
           }
         }
 
+        // Pull exact args + result from the debug log (session log often
+        // leaves these empty). Subagent tool calls are matched later, in the
+        // per-subagent message build, so skip them here to avoid double-consume.
+        const dbg = part.subAgentInvocationId
+          ? undefined
+          : consumeDebugToolCall(debugToolCalls.main, name);
+
         toolCalls.push({
           id: part.toolCallId || `${name}-${toolCalls.length}`,
           name,
-          arguments: inputText ? { input: inputText } : {},
+          arguments: dbg?.arguments ?? (inputText ? { input: inputText } : {}),
+          result: dbg?.result,
         });
 
         const existing = toolUsageMap.get(name) || { count: 0 };
@@ -756,6 +883,7 @@ function buildSession(
       const dedupedSaParts = deduplicateResponseParts(parts);
       const saToolCalls: ToolCall[] = [];
       let saTextParts = '';
+      const saDebugQueues = debugToolCalls.perSubagent.get(toolCallId);
 
       for (const p of dedupedSaParts) {
         if (p.kind === 'toolInvocationSerialized' && p.toolCallId) {
@@ -774,10 +902,13 @@ function buildSession(
             }
           }
 
+          const saDbg = consumeDebugToolCall(saDebugQueues, name);
+
           saToolCalls.push({
             id: p.toolCallId,
             name,
-            arguments: inputText ? { input: inputText } : {},
+            arguments: saDbg?.arguments ?? (inputText ? { input: inputText } : {}),
+            result: saDbg?.result,
           });
         } else if (!p.kind && typeof p.value === 'string' && !/^[\s`]*$/.test(p.value)) {
           let saText = p.value.replace(/^\[LLM MODEL ID\]\s*/m, '');
@@ -871,6 +1002,9 @@ function buildSession(
   const chatSessionsDir = dirname(sourcePath);                // .../chatSessions
   const storageEntryDir = dirname(chatSessionsDir);           // .../workspaceStorage/<hash>  OR  .../globalStorage
   const workspaceJsonPath = join(storageEntryDir, 'workspace.json');
+  // projectPath = the folder path recorded in workspace.json (the real project dir).
+  // Falls back to the storage entry dir when workspace.json is absent (Empty Window).
+  let projectPath = storageEntryDir;
   if (existsSync(workspaceJsonPath)) {
     try {
       const wsData = JSON.parse(readFileSync(workspaceJsonPath, 'utf-8'));
@@ -878,6 +1012,7 @@ function buildSession(
         const urlStr = wsData.folder as string;
         const decoded = decodeURIComponent(urlStr.replace(/^file:\/\/\//, '').replace(/\\/g, '/'));
         projectName = basename(decoded);
+        projectPath = decoded;
       }
     } catch {
       // fall back to hash dir name
@@ -889,7 +1024,7 @@ function buildSession(
     id: sessionId,
     source: 'vscode',
     project: projectName,
-    projectPath: sourcePath,
+    projectPath,
     startTime,
     lastActivity,
     messageCount: messages.length,

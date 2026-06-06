@@ -40,6 +40,24 @@ function copyContent() {
   }
 }
 
+/** Pretty-print tool arguments. */
+function formatToolArgs(args: Record<string, unknown>): string {
+  try {
+    return JSON.stringify(args, null, 2)
+  } catch {
+    return String(args)
+  }
+}
+
+/** Pretty-print a tool result; if it's a JSON string, re-indent it. */
+function formatToolResult(result: string): string {
+  try {
+    return JSON.stringify(JSON.parse(result), null, 2)
+  } catch {
+    return result
+  }
+}
+
 function handleKeydown(e: KeyboardEvent) {
   if (!isOpen.value) return
 
@@ -71,6 +89,7 @@ onUnmounted(() => {
       <div
         v-if="isOpen"
         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+        data-name="content-preview-modal"
         @click.self="close"
       >
         <div class="bg-primary rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
@@ -178,7 +197,7 @@ onUnmounted(() => {
 
           <!-- Content -->
           <div class="flex-1 overflow-y-auto p-4">
-            <div v-if="message?.content" class="message-content whitespace-pre-wrap break-words text-primary">
+            <div v-if="message?.content" data-name="message-content" class="message-content whitespace-pre-wrap break-words text-primary font-mono">
               {{ message.content }}
             </div>
             <div v-else-if="!message?.toolCalls?.length && !message?.toolResult" class="text-muted text-sm italic">
@@ -201,7 +220,14 @@ onUnmounted(() => {
                     </svg>
                     <span class="font-medium text-yellow-800 dark:text-yellow-200">{{ tool.name }}</span>
                   </div>
-                  <pre class="p-3 text-xs overflow-x-auto"><code>{{ JSON.stringify(tool.arguments, null, 2) }}</code></pre>
+                  <!-- Input -->
+                  <div class="px-3 pt-2 text-xs font-semibold text-muted uppercase tracking-wider">Input</div>
+                  <pre class="px-3 pb-2 text-xs overflow-x-auto"><code>{{ formatToolArgs(tool.arguments) }}</code></pre>
+                  <!-- Result -->
+                  <template v-if="tool.result">
+                    <div class="px-3 pt-1 text-xs font-semibold text-muted uppercase tracking-wider border-t border-default/50">Result</div>
+                    <pre class="px-3 pb-2 pt-2 text-xs overflow-x-auto max-h-64"><code>{{ formatToolResult(tool.result) }}</code></pre>
+                  </template>
                 </div>
               </div>
             </div>

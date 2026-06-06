@@ -267,24 +267,39 @@ export function getSession(source: SessionSource, sessionId: string): SessionDet
   const cacheKey = getCacheKey(source, sessionId);
   let detail = sessionCache.get(cacheKey);
 
-  if (detail) {
-    return detail;
+  if (!detail) {
+    const files = findSessionFiles(source);
+    const filePath = files.get(sessionId);
+
+    if (!filePath) {
+      return null;
+    }
+
+    detail = parseSessionFile(filePath, source) || undefined;
+
+    if (detail) {
+      sessionCache.set(cacheKey, detail);
+    }
   }
 
-  const files = findSessionFiles(source);
-  const filePath = files.get(sessionId);
-
-  if (!filePath) {
+  if (!detail) {
     return null;
   }
 
-  detail = parseSessionFile(filePath, source) || undefined;
-
-  if (detail) {
-    sessionCache.set(cacheKey, detail);
+  // Always surface the raw log file location, even on a cache hit. listSessions()
+  // shares this cache and stores details WITHOUT these fields, so we (re)compute
+  // them here. OpenCode DB-backed sessions use a `db::<id>` sentinel (no real file).
+  if (detail.logFilePath === undefined || detail.logAvailable === undefined) {
+    const files = findSessionFiles(source);
+    const filePath = files.get(sessionId);
+    if (filePath) {
+      const isDbBacked = filePath.startsWith('db::');
+      detail.logFilePath = filePath;
+      detail.logAvailable = !isDbBacked && existsSync(filePath);
+    }
   }
 
-  return detail || null;
+  return detail;
 }
 
 export function getSessionMessages(

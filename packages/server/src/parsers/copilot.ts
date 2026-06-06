@@ -262,7 +262,7 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
           name: tr.name,
           arguments: tr.arguments,
         }));
-        const msgContent = event.data.reasoningText || '';
+        const msgContent = event.data.content || event.data.reasoningText || '';
 
         // ── Route subagent-owned messages to that agent's message log ──
         if (event.agentId && subAgentMap.has(event.agentId)) {

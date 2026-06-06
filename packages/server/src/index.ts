@@ -16,7 +16,7 @@ const server = createServer(app);
 
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -65,6 +65,22 @@ app.use('/api/watch', createWatchRouter(broadcast));
 // Health check
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Version (read from this package's package.json at runtime)
+let cachedVersion: { name: string; version: string } | null = null;
+app.get('/api/version', (_req, res) => {
+  try {
+    if (!cachedVersion) {
+      const pkgRaw = readFileSync(join(packageRoot, 'package.json'), 'utf-8');
+      const pkg = JSON.parse(pkgRaw) as { name?: string; version?: string };
+      cachedVersion = { name: pkg.name ?? 'agent-session-viewer', version: pkg.version ?? '0.0.0' };
+    }
+    res.json(cachedVersion);
+  } catch (error) {
+    console.error('Error reading version:', error);
+    res.json({ name: 'agent-session-viewer', version: 'unknown' });
+  }
 });
 
 // Serve static files only when the client bundle is present (production/standalone mode).
