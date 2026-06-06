@@ -130,7 +130,7 @@ sessionsRouter.get('/:source/:sessionId/logfile', (req, res) => {
     const downloadName = `${source}-${sessionId}${ext}`;
     res.download(filePath, downloadName, (err) => {
       if (err && !res.headersSent) {
-        console.error(`Failed to send log file for ${sessionId}:`, err);
+        console.error('Failed to send log file for %s:', sessionId, err);
         res.status(500).json({ error: 'Internal server error', message: 'Failed to send log file' });
       }
     });
