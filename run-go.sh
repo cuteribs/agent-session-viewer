@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
-set -euo pipefail
-cd "$(dirname "$0")"
 
 # ── 1. Build the Vue client ─────────────────────────────────────────────────
 echo ">>> Building client..."
-pushd client > /dev/null
-npm install --silent
-npm run build --silent
-popd > /dev/null
+pushd client
+npm install
+npm run build
+popd
 
 # ── 2. Copy client dist into the Go server's static directory ──────────────
 # The Go binary serves files from <binary-dir>/dist/public/
@@ -18,9 +16,9 @@ cp -r client/dist/. server-go/dist/public/
 
 # ── 3. Build the Go server ──────────────────────────────────────────────────
 echo ">>> Building Go server..."
-pushd server-go > /dev/null
+pushd server-go
 go build -o agent-session-viewer .
-popd > /dev/null
+popd
 
 # ── 4. Launch ───────────────────────────────────────────────────────────────
 echo ">>> Starting Agent Session Viewer..."
