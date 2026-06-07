@@ -2,6 +2,81 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── MD3 Surface & Text Tokens (RGB triplets for Tailwind opacity support) ── */
+:root {
+  --color-background:                247 249 251;
+  --color-on-background:             25 28 30;
+  --color-surface:                   247 249 251;
+  --color-on-surface:                25 28 30;
+  --color-on-surface-variant:        70 69 85;
+  --color-surface-container-lowest:  255 255 255;
+  --color-surface-container-low:     242 244 246;
+  --color-surface-container:         236 238 240;
+  --color-surface-container-high:    230 232 234;
+  --color-surface-container-highest: 224 227 229;
+  --color-surface-dim:               216 218 220;
+  --color-surface-bright:            247 249 251;
+  --color-outline-variant:           199 196 216;
+  --color-outline:                   119 117 135;
+  --color-inverse-surface:           45 49 51;
+  --color-inverse-on-surface:        239 241 243;
+  --color-primary:                   53 37 205;
+  --color-on-primary:                255 255 255;
+  --color-primary-container:         79 70 229;
+  --color-on-primary-container:      218 215 255;
+  --color-inverse-primary:           195 192 255;
+  --color-primary-fixed:             226 223 255;
+  --color-primary-fixed-dim:         195 192 255;
+  --color-secondary:                 86 94 116;
+  --color-secondary-container:       218 226 253;
+  --color-on-secondary-container:    92 100 122;
+  --color-error:                     186 26 26;
+  --color-on-error:                  255 255 255;
+  --color-error-container:           255 218 214;
+  --color-on-error-container:        147 0 10;
+  --color-tertiary-container:        75 77 216;
+  --color-on-tertiary-container:     217 216 255;
+  --color-surface-tint:              77 68 227;
+  --color-tertiary:                  49 48 192;
+}
+
+.dark {
+  --color-background:                26 28 30;
+  --color-on-background:             226 227 229;
+  --color-surface:                   26 28 30;
+  --color-on-surface:                226 227 229;
+  --color-on-surface-variant:        197 195 213;
+  --color-surface-container-lowest:  20 22 24;
+  --color-surface-container-low:     33 36 38;
+  --color-surface-container:         42 45 47;
+  --color-surface-container-high:    52 55 57;
+  --color-surface-container-highest: 63 66 68;
+  --color-surface-dim:               18 20 22;
+  --color-surface-bright:            56 59 61;
+  --color-outline-variant:           71 70 79;
+  --color-outline:                   145 143 156;
+  --color-inverse-surface:           226 227 229;
+  --color-inverse-on-surface:        45 49 51;
+  --color-primary:                   195 192 255;
+  --color-on-primary:                25 0 167;
+  --color-primary-container:         42 34 180;
+  --color-on-primary-container:      15 0 105;
+  --color-inverse-primary:           53 37 205;
+  --color-primary-fixed:             226 223 255;
+  --color-primary-fixed-dim:         195 192 255;
+  --color-secondary:                 190 198 224;
+  --color-secondary-container:       63 71 92;
+  --color-on-secondary-container:    218 226 253;
+  --color-error:                     255 180 171;
+  --color-on-error:                  105 0 5;
+  --color-error-container:           147 0 10;
+  --color-on-error-container:        255 218 214;
+  --color-tertiary-container:        49 48 192;
+  --color-on-tertiary-container:     217 216 255;
+  --color-surface-tint:              195 192 255;
+  --color-tertiary:                  195 192 255;
+}
+
 /* Material Symbols */
 .material-symbols-outlined {
   font-family: 'Material Symbols Outlined';

@@ -21,14 +21,14 @@ function handleSourceChange(e: Event) {
 </script>
 
 <template>
-  <header class="bg-surface dark:bg-inverse-surface border-b border-outline-variant dark:border-outline flex justify-between items-center w-full px-gutter h-16 shrink-0 z-50">
+  <header class="bg-surface border-b border-outline-variant flex justify-between items-center w-full px-gutter h-16 shrink-0 z-50">
     <!-- Logo -->
     <div class="flex items-center gap-stack-md">
       <span
-        class="material-symbols-outlined text-primary dark:text-inverse-primary text-2xl"
+        class="material-symbols-outlined text-primary text-2xl"
         style="font-variation-settings: 'FILL' 1"
       >terminal</span>
-      <span class="font-headline-md text-headline-md font-bold text-primary dark:text-inverse-primary hidden sm:block">
+      <span class="font-headline-md text-headline-md font-bold text-primary hidden sm:block">
         Agent Session Viewer
       </span>
     </div>

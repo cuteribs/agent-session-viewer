@@ -10,7 +10,7 @@ const { prefs, setListViewMode } = usePreferences()
 <template>
   <aside
     data-name="sidebar"
-    class="bg-surface-container dark:bg-inverse-surface hidden md:flex flex-col h-full w-sidebar-width shrink-0 border-r border-outline-variant z-40"
+    class="bg-surface-container hidden md:flex flex-col h-full w-sidebar-width shrink-0 border-r border-outline-variant z-40"
   >
     <!-- Search + Sort controls -->
     <div class="px-gutter py-3 border-b border-outline-variant flex flex-col gap-2">
