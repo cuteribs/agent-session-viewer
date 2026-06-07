@@ -1,0 +1,311 @@
+<!doctype html>
+<html
+  class="light"
+  lang="en"
+  style=""
+>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      content="width=device-width, initial-scale=1.0"
+      name="viewport"
+    />
+    <title>Agent Session Viewer</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@400;450&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              'on-secondary': '#ffffff',
+              'surface-container-lowest': '#ffffff',
+              'primary-fixed': '#e2dfff',
+              'primary-fixed-dim': '#c3c0ff',
+              'on-tertiary-container': '#d9d8ff',
+              'on-surface-variant': '#464555',
+              'surface-variant': '#e0e3e5',
+              'on-secondary-fixed': '#131b2e',
+              'on-secondary-container': '#5c647a',
+              surface: '#f7f9fb',
+              'on-error-container': '#93000a',
+              error: '#ba1a1a',
+              'secondary-fixed-dim': '#bec6e0',
+              secondary: '#565e74',
+              'on-surface': '#191c1e',
+              'on-primary-container': '#dad7ff',
+              'tertiary-fixed': '#e1e0ff',
+              'tertiary-container': '#4b4dd8',
+              'surface-tint': '#4d44e3',
+              'surface-container': '#eceef0',
+              'on-primary': '#ffffff',
+              'secondary-fixed': '#dae2fd',
+              'on-tertiary-fixed-variant': '#2f2ebe',
+              'on-tertiary': '#ffffff',
+              'surface-container-low': '#f2f4f6',
+              'outline-variant': '#c7c4d8',
+              'surface-container-highest': '#e0e3e5',
+              'on-tertiary-fixed': '#07006c',
+              primary: '#3525cd',
+              'tertiary-fixed-dim': '#c0c1ff',
+              'error-container': '#ffdad6',
+              'surface-bright': '#f7f9fb',
+              'primary-container': '#4f46e5',
+              'on-primary-fixed-variant': '#3323cc',
+              'on-background': '#191c1e',
+              outline: '#777587',
+              tertiary: '#3130c0',
+              'surface-dim': '#d8dadc',
+              'on-primary-fixed': '#0f0069',
+              'inverse-surface': '#2d3133',
+              background: '#f7f9fb',
+              'surface-container-high': '#e6e8ea',
+              'on-secondary-fixed-variant': '#3f465c',
+              'on-error': '#ffffff',
+              'inverse-on-surface': '#eff1f3',
+              'secondary-container': '#dae2fd',
+              'inverse-primary': '#c3c0ff',
+            },
+            borderRadius: {
+              DEFAULT: '0.125rem',
+              lg: '0.25rem',
+              xl: '0.5rem',
+              full: '0.75rem',
+            },
+            spacing: {
+              'stack-sm': '8px',
+              'sidebar-collapsed': '64px',
+              gutter: '16px',
+              base: '4px',
+              'stack-md': '16px',
+              'container-padding': '24px',
+              'sidebar-width': '260px',
+            },
+            fontFamily: {
+              'body-md': ['Inter'],
+              'label-caps': ['Inter'],
+              'code-sm': ['JetBrains Mono'],
+              'headline-sm': ['Inter'],
+              'headline-md': ['Inter'],
+              'body-sm': ['Inter'],
+              'headline-lg': ['Inter'],
+              'code-md': ['JetBrains Mono'],
+            },
+            fontSize: {
+              'body-md': ['14px', { lineHeight: '20px', fontWeight: '400' }],
+              'label-caps': ['11px', { lineHeight: '16px', letterSpacing: '0.05em', fontWeight: '700' }],
+              'code-sm': ['12px', { lineHeight: '18px', fontWeight: '400' }],
+              'headline-sm': ['16px', { lineHeight: '24px', fontWeight: '600' }],
+              'headline-md': ['20px', { lineHeight: '28px', letterSpacing: '-0.01em', fontWeight: '600' }],
+              'body-sm': ['13px', { lineHeight: '18px', fontWeight: '400' }],
+              'headline-lg': ['24px', { lineHeight: '32px', letterSpacing: '-0.02em', fontWeight: '600' }],
+              'code-md': ['13px', { lineHeight: '20px', fontWeight: '450' }],
+            },
+          },
+        },
+      };
+    </script>
+  </head>
+  <body class="bg-background text-on-background font-body-md h-screen flex flex-col overflow-hidden">
+    <div class="flex-1 overflow-y-auto bg-surface-container-low p-container-padding relative z-0">
+      <!-- Summary Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-stack-md mb-container-padding">
+        <div class="bg-surface border border-outline-variant rounded-lg p-4 flex flex-col gap-2">
+          <div class="flex items-center justify-between text-on-surface-variant">
+            <span class="font-label-caps text-label-caps uppercase text-secondary">Input Tokens</span>
+            <span class="material-symbols-outlined text-[18px]">input</span>
+          </div>
+          <div class="font-headline-lg text-headline-lg text-on-surface">14,208</div>
+          <div class="font-body-sm text-body-sm text-on-surface-variant">+12% vs last session</div>
+        </div>
+        <div class="bg-surface border border-outline-variant rounded-lg p-4 flex flex-col gap-2">
+          <div class="flex items-center justify-between text-on-surface-variant">
+            <span class="font-label-caps text-label-caps uppercase text-secondary">Output Tokens</span>
+            <span class="material-symbols-outlined text-[18px]">output</span>
+          </div>
+          <div class="font-headline-lg text-headline-lg text-on-surface">3,842</div>
+          <div class="font-body-sm text-body-sm text-on-surface-variant">-5% vs last session</div>
+        </div>
+        <div class="bg-surface border border-outline-variant rounded-lg p-4 flex flex-col gap-2">
+          <div class="flex items-center justify-between text-on-surface-variant">
+            <span class="font-label-caps text-label-caps uppercase text-secondary">Cached Tokens</span>
+            <span class="material-symbols-outlined text-[18px]">memory_alt</span>
+          </div>
+          <div class="font-headline-lg text-headline-lg text-on-surface">45,910</div>
+          <div class="font-body-sm text-body-sm text-primary flex items-center gap-1">
+            <span class="material-symbols-outlined text-[14px]">trending_up</span> High efficiency
+          </div>
+        </div>
+        <div class="bg-surface border border-outline-variant rounded-lg p-4 flex flex-col gap-2 relative overflow-hidden">
+          <div class="absolute right-0 top-0 w-16 h-16 bg-primary/5 rounded-bl-full"></div>
+          <div class="flex items-center justify-between text-on-surface-variant relative z-10">
+            <span class="font-label-caps text-label-caps uppercase text-secondary">Total Cost</span>
+            <span class="material-symbols-outlined text-[18px]">payments</span>
+          </div>
+          <div class="font-headline-lg text-headline-lg text-primary relative z-10">$0.142</div>
+          <div class="font-body-sm text-body-sm text-on-surface-variant relative z-10">Est. based on current rates</div>
+        </div>
+      </div>
+      <!-- Charts Row -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-stack-md mb-container-padding">
+        <!-- Token Usage Chart (Placeholder) -->
+        <div class="lg:col-span-2 bg-surface border border-outline-variant rounded-lg p-container-padding">
+          <div class="flex justify-between items-center mb-6">
+            <h3 class="font-headline-sm text-headline-sm text-on-surface">Token Usage per Message</h3>
+            <div class="flex gap-2">
+              <button class="px-2 py-1 text-label-caps font-label-caps bg-surface-container rounded text-on-surface">Line</button>
+              <button class="px-2 py-1 text-label-caps font-label-caps bg-surface rounded text-on-surface-variant border border-outline-variant">Bar</button>
+            </div>
+          </div>
+          <!-- Simulated Chart Area -->
+          <div class="h-64 border-b border-l border-outline-variant relative">
+            <!-- Y-axis labels -->
+            <div class="absolute -left-8 bottom-0 font-code-sm text-code-sm text-on-surface-variant">0</div>
+            <div class="absolute -left-10 top-1/2 font-code-sm text-code-sm text-on-surface-variant">1k</div>
+            <div class="absolute -left-10 top-0 font-code-sm text-code-sm text-on-surface-variant">2k</div>
+            <!-- Grid lines -->
+            <div class="absolute top-1/2 w-full border-t border-dashed border-outline-variant/50"></div>
+            <!-- Mock Bars -->
+            <div class="absolute bottom-0 left-[10%] w-8 h-[20%] bg-primary-fixed border border-primary-fixed-dim"></div>
+            <div class="absolute bottom-[20%] left-[10%] w-8 h-[5%] bg-tertiary-container border border-tertiary"></div>
+            <div class="absolute bottom-0 left-[25%] w-8 h-[45%] bg-primary-fixed border border-primary-fixed-dim"></div>
+            <div class="absolute bottom-[45%] left-[25%] w-8 h-[15%] bg-tertiary-container border border-tertiary"></div>
+            <div class="absolute bottom-0 left-[40%] w-8 h-[30%] bg-primary-fixed border border-primary-fixed-dim"></div>
+            <div class="absolute bottom-[30%] left-[40%] w-8 h-[60%] bg-tertiary-container border border-tertiary"></div>
+            <div class="absolute bottom-0 left-[55%] w-8 h-[80%] bg-primary-fixed border border-primary-fixed-dim"></div>
+            <div class="absolute bottom-[80%] left-[55%] w-8 h-[10%] bg-tertiary-container border border-tertiary"></div>
+            <div class="absolute bottom-0 left-[70%] w-8 h-[15%] bg-primary-fixed border border-primary-fixed-dim"></div>
+            <div class="absolute bottom-[15%] left-[70%] w-8 h-[5%] bg-tertiary-container border border-tertiary"></div>
+            <div class="absolute bottom-0 left-[85%] w-8 h-[50%] bg-primary-fixed border border-primary-fixed-dim"></div>
+            <div class="absolute bottom-[50%] left-[85%] w-8 h-[20%] bg-tertiary-container border border-tertiary"></div>
+            <!-- X-axis labels -->
+            <div class="absolute -bottom-6 left-[10%] font-code-sm text-code-sm text-on-surface-variant">Msg 1</div>
+            <div class="absolute -bottom-6 left-[40%] font-code-sm text-code-sm text-on-surface-variant">Msg 3</div>
+            <div class="absolute -bottom-6 left-[70%] font-code-sm text-code-sm text-on-surface-variant">Msg 5</div>
+          </div>
+          <div class="flex justify-center gap-4 mt-8">
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 bg-primary-fixed rounded-sm"></span><span class="font-label-caps text-label-caps text-secondary">Input</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 bg-tertiary-container rounded-sm"></span><span class="font-label-caps text-label-caps text-secondary">Output</span>
+            </div>
+          </div>
+        </div>
+        <!-- Tool Usage Distribution (Placeholder) -->
+        <div class="bg-surface border border-outline-variant rounded-lg p-container-padding">
+          <h3 class="font-headline-sm text-headline-sm text-on-surface mb-6">Tool Usage Dist.</h3>
+          <div class="flex justify-center items-center h-48 relative">
+            <!-- Mock Donut Chart using CSS conic-gradient -->
+            <div
+              class="w-40 h-40 rounded-full border-8 border-surface"
+              style="background: conic-gradient(#4f46e5 0% 45%, #dae2fd 45% 75%, #c7c4d8 75% 90%, #e6e8ea 90% 100%)"
+            >
+              <div
+                class="w-full h-full rounded-full bg-surface flex items-center justify-center m-[2px]"
+                style="width: calc(100% - 4px); height: calc(100% - 4px)"
+              >
+                <div class="text-center">
+                  <div class="font-headline-md text-headline-md text-on-surface">24</div>
+                  <div class="font-label-caps text-label-caps text-secondary">Total Calls</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="flex flex-col gap-2 mt-4">
+            <div class="flex justify-between items-center text-body-sm font-body-sm text-on-surface-variant">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 bg-primary-container rounded-full"></span>
+                <span>execute_sql</span>
+              </div>
+              <span>45%</span>
+            </div>
+            <div class="flex justify-between items-center text-body-sm font-body-sm text-on-surface-variant">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 bg-secondary-container rounded-full"></span>
+                <span>read_file</span>
+              </div>
+              <span>30%</span>
+            </div>
+            <div class="flex justify-between items-center text-body-sm font-body-sm text-on-surface-variant">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 bg-outline-variant rounded-full"></span>
+                <span>web_search</span>
+              </div>
+              <span>15%</span>
+            </div>
+            <div class="flex justify-between items-center text-body-sm font-body-sm text-on-surface-variant">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 bg-surface-container-high rounded-full"></span>
+                <span>list_dir</span>
+              </div>
+              <span>10%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Tool Usage Table -->
+      <div class="bg-surface border border-outline-variant rounded-lg overflow-hidden">
+        <div class="p-4 border-b border-outline-variant bg-surface-container-low">
+          <h3 class="font-headline-sm text-headline-sm text-on-surface">Tool Invocation Details</h3>
+        </div>
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-outline-variant">
+              <th class="p-3 font-label-caps text-label-caps text-secondary uppercase tracking-wider">Tool Name</th>
+              <th class="p-3 font-label-caps text-label-caps text-secondary uppercase tracking-wider">Invocation Count</th>
+              <th class="p-3 font-label-caps text-label-caps text-secondary uppercase tracking-wider">Avg Latency</th>
+              <th class="p-3 font-label-caps text-label-caps text-secondary uppercase tracking-wider">Error Rate</th>
+            </tr>
+          </thead>
+          <tbody class="font-body-sm text-body-sm">
+            <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors">
+              <td class="p-3 font-code-sm text-code-sm text-primary">execute_sql</td>
+              <td class="p-3 text-on-surface">11</td>
+              <td class="p-3 text-on-surface-variant">420ms</td>
+              <td class="p-3 text-on-surface-variant">
+                <span class="px-2 py-0.5 bg-surface-container rounded text-xs">0%</span>
+              </td>
+            </tr>
+            <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors">
+              <td class="p-3 font-code-sm text-code-sm text-primary">read_file</td>
+              <td class="p-3 text-on-surface">7</td>
+              <td class="p-3 text-on-surface-variant">12ms</td>
+              <td class="p-3 text-on-surface-variant">
+                <span class="px-2 py-0.5 bg-surface-container rounded text-xs">0%</span>
+              </td>
+            </tr>
+            <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors">
+              <td class="p-3 font-code-sm text-code-sm text-primary">web_search</td>
+              <td class="p-3 text-on-surface">4</td>
+              <td class="p-3 text-on-surface-variant">1.2s</td>
+              <td class="p-3 text-on-surface-variant">
+                <span class="px-2 py-0.5 bg-error-container text-on-error-container rounded text-xs">25%</span>
+              </td>
+            </tr>
+            <tr class="hover:bg-surface-container-low transition-colors">
+              <td class="p-3 font-code-sm text-code-sm text-primary">list_dir</td>
+              <td class="p-3 text-on-surface">2</td>
+              <td class="p-3 text-on-surface-variant">8ms</td>
+              <td class="p-3 text-on-surface-variant">
+                <span class="px-2 py-0.5 bg-surface-container rounded text-xs">0%</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </body>
+</html>
