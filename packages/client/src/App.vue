@@ -19,10 +19,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-secondary">
+  <div class="bg-background text-on-background font-body-md h-screen flex flex-col overflow-hidden">
     <AppHeader />
 
-    <div class="flex h-[calc(100vh-64px)]">
+    <div class="flex flex-1 overflow-hidden">
       <Sidebar />
       <MainContent />
     </div>

@@ -40,12 +40,12 @@ function durationFormatted(ms?: number) {
 <template>
   <div data-name="subagent-view" class="flex flex-col h-full">
     <!-- Header -->
-    <div data-name="subagent-header" class="bg-primary border-b border-default px-4 py-3">
+    <div data-name="subagent-header" class="bg-surface border-b border-outline-variant px-4 py-3">
       <!-- Breadcrumb -->
       <button
         data-name="subagent-back"
         @click="emit('back')"
-        class="flex items-center gap-1 text-sm text-accent hover:text-accent/80 mb-2 transition-colors"
+        class="flex items-center gap-1 text-sm text-primary hover:text-primary/80 mb-2 transition-colors"
       >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
@@ -55,7 +55,7 @@ function durationFormatted(ms?: number) {
 
       <!-- Agent title -->
       <div class="flex items-center gap-2 flex-wrap">
-        <span data-name="subagent-id" class="text-lg font-semibold text-primary">{{ agent.agentId }}</span>
+        <span data-name="subagent-id" class="text-lg font-semibold text-on-surface">{{ agent.agentId }}</span>
         <span data-name="subagent-type-badge" class="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
           {{ agent.agentDisplayName || agent.agentType }}
         </span>
@@ -71,41 +71,41 @@ function durationFormatted(ms?: number) {
           {{ agent.status }}
         </span>
       </div>
-      <p v-if="agent.description" data-name="subagent-description" class="text-sm text-muted mt-1">{{ agent.description }}</p>
+      <p v-if="agent.description" data-name="subagent-description" class="text-sm text-on-surface-variant mt-1">{{ agent.description }}</p>
 
       <!-- Stats -->
       <div data-name="subagent-stats" class="flex items-center gap-6 mt-2 text-sm flex-wrap">
         <div v-if="agent.model" data-name="subagent-stat-model" class="flex items-center gap-1">
-          <span class="text-muted">Model:</span>
+          <span class="text-on-surface-variant">Model:</span>
           <span class="font-medium">{{ agent.model }}</span>
         </div>
         <div v-if="agent.totalTokens" data-name="subagent-stat-tokens" class="flex items-center gap-1">
-          <span class="text-muted">Tokens:</span>
+          <span class="text-on-surface-variant">Tokens:</span>
           <span class="font-medium">{{ formatTokens(agent.totalTokens) }}</span>
         </div>
         <div v-if="agent.totalToolCalls" data-name="subagent-stat-tool-calls" class="flex items-center gap-1">
-          <span class="text-muted">Tool calls:</span>
+          <span class="text-on-surface-variant">Tool calls:</span>
           <span class="font-medium">{{ agent.totalToolCalls }}</span>
         </div>
         <div v-if="agent.durationMs" data-name="subagent-stat-duration" class="flex items-center gap-1">
-          <span class="text-muted">Duration:</span>
+          <span class="text-on-surface-variant">Duration:</span>
           <span class="font-medium">{{ durationFormatted(agent.durationMs) }}</span>
         </div>
         <div v-if="agent.messages?.length" data-name="subagent-stat-messages" class="flex items-center gap-1">
-          <span class="text-muted">Messages:</span>
+          <span class="text-on-surface-variant">Messages:</span>
           <span class="font-medium">{{ agent.messages.length }}</span>
         </div>
       </div>
     </div>
 
     <!-- Input / Result panels -->
-    <div data-name="subagent-io" class="bg-primary border-b border-default px-4 py-3 space-y-3">
+    <div data-name="subagent-io" class="bg-surface border-b border-outline-variant px-4 py-3 space-y-3">
       <!-- Input (prompt) -->
       <div v-if="inputPrompt" data-name="subagent-input">
         <button
           data-name="subagent-input-toggle"
           @click="showInput = !showInput"
-          class="flex items-center gap-1.5 text-xs font-semibold text-muted uppercase tracking-wide hover:text-primary transition-colors"
+          class="flex items-center gap-1.5 text-xs font-semibold text-on-surface-variant uppercase tracking-wide hover:text-on-surface transition-colors"
         >
           <svg :class="['w-3 h-3 transition-transform', showInput ? 'rotate-90' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
@@ -115,7 +115,7 @@ function durationFormatted(ms?: number) {
         <pre
           v-if="showInput"
           data-name="subagent-input-text"
-          class="mt-1.5 p-3 bg-tertiary rounded text-sm text-primary whitespace-pre-wrap break-words max-h-60 overflow-y-auto font-mono"
+          class="mt-1.5 p-3 bg-surface-container-high rounded text-sm text-on-surface whitespace-pre-wrap break-words max-h-60 overflow-y-auto font-mono"
         >{{ inputPrompt }}</pre>
       </div>
 
@@ -124,7 +124,7 @@ function durationFormatted(ms?: number) {
         <button
           data-name="subagent-result-toggle"
           @click="showResult = !showResult"
-          class="flex items-center gap-1.5 text-xs font-semibold text-muted uppercase tracking-wide hover:text-primary transition-colors"
+          class="flex items-center gap-1.5 text-xs font-semibold text-on-surface-variant uppercase tracking-wide hover:text-on-surface transition-colors"
         >
           <svg :class="['w-3 h-3 transition-transform', showResult ? 'rotate-90' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
@@ -134,13 +134,13 @@ function durationFormatted(ms?: number) {
         <pre
           v-if="showResult"
           data-name="subagent-result-text"
-          class="mt-1.5 p-3 bg-green-50 dark:bg-green-900/15 border border-green-200 dark:border-green-800 rounded text-sm text-primary whitespace-pre-wrap break-words max-h-60 overflow-y-auto font-mono"
+          class="mt-1.5 p-3 bg-green-50 dark:bg-green-900/15 border border-green-200 dark:border-green-800 rounded text-sm text-on-surface whitespace-pre-wrap break-words max-h-60 overflow-y-auto font-mono"
         >{{ result }}</pre>
       </div>
     </div>
 
     <!-- Tab bar -->
-    <div data-name="subagent-tab-nav" class="bg-primary border-b border-default px-4">
+    <div data-name="subagent-tab-nav" class="bg-surface border-b border-outline-variant px-4">
       <nav class="flex gap-1">
         <button
           v-for="tab in tabs"
@@ -150,8 +150,8 @@ function durationFormatted(ms?: number) {
           :class="[
             'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors',
             activeTab === tab.id
-              ? 'text-accent border-accent'
-              : 'text-secondary border-transparent hover:text-primary hover:border-gray-300',
+              ? 'text-primary border-primary'
+              : 'text-on-surface-variant border-transparent hover:text-on-surface hover:border-gray-300',
           ]"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

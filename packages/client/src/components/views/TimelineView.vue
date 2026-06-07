@@ -139,16 +139,16 @@ function summarizeArgs(args: Record<string, unknown>): string {
     >
       <div
         :class="[
-          'flex-1 bg-primary rounded-lg shadow-sm border transition-all cursor-pointer',
+          'flex-1 bg-surface rounded-lg shadow-sm border transition-all cursor-pointer',
           sessionsStore.selectedMessageIndex === getDisplayIndex(node.message.id)
-            ? 'border-accent bg-accent/5 ring-2 ring-accent/30'
-            : 'border-default'
+            ? 'border-primary bg-primary/5 ring-2 ring-primary/30'
+            : 'border-outline-variant'
         ]"
         @click="openPreview(node.message)"
       >
-        <div data-name="message-header" class="flex items-center justify-between px-4 py-2 bg-tertiary/50">
+        <div data-name="message-header" class="flex items-center justify-between px-4 py-2 bg-surface-container-low rounded-t-lg">
           <div class="flex items-center gap-3 min-w-0">
-            <span data-name="message-number" class="text-xs text-muted">#{{ getDisplayIndex(node.message.id) + 1 }}</span>
+            <span data-name="message-number" class="text-xs text-on-surface-variant">#{{ getDisplayIndex(node.message.id) + 1 }}</span>
             <span
               data-name="message-role"
               :class="[
@@ -158,10 +158,10 @@ function summarizeArgs(args: Record<string, unknown>): string {
             >
               {{ node.message.role }}
             </span>
-            <span v-if="node.message.model" data-name="message-model" class="text-xs text-muted truncate">
+            <span v-if="node.message.model" data-name="message-model" class="text-xs text-on-surface-variant truncate">
               {{ node.message.model }}
             </span>
-            <span v-if="hasChildren(node)" class="text-xs text-muted">
+            <span v-if="hasChildren(node)" class="text-xs text-on-surface-variant">
               {{ node.children.length }} child{{ node.children.length === 1 ? '' : 'ren' }}
             </span>
           </div>
@@ -169,7 +169,7 @@ function summarizeArgs(args: Record<string, unknown>): string {
             <span
               v-if="node.message.tokens"
               data-name="message-token-badge"
-              class="text-xs px-2 py-0.5 bg-secondary rounded"
+              class="text-xs px-2 py-0.5 bg-surface-container rounded"
               :title="node.message.tokens.estimated
                 ? `~Input: ${node.message.tokens.input.toLocaleString()} (est. conv context), Output: ${node.message.tokens.output.toLocaleString()} (exact), ~Cache: ${(node.message.tokens.cacheRead ?? 0).toLocaleString()} (est. sys overhead)`
                 : `Input: ${node.message.tokens.input.toLocaleString()}, Output: ${node.message.tokens.output.toLocaleString()}`"
@@ -184,17 +184,17 @@ function summarizeArgs(args: Record<string, unknown>): string {
             >
               <span v-if="node.message.tokens.estimated" class="opacity-70">~</span>{{ formatCost(node.message.tokens.cost) }}
             </span>
-            <span data-name="message-time" class="text-xs text-muted">
+            <span data-name="message-time" class="text-xs text-on-surface-variant">
               {{ formatTime(node.message.timestamp) }}
             </span>
           </div>
         </div>
 
         <div data-name="message-body" class="px-4">
-          <p v-if="node.message.content" data-name="message-content-text" class="text-sm text-primary whitespace-pre-wrap break-words py-3 font-mono">
+          <p v-if="node.message.content" data-name="message-content-text" class="text-sm text-on-surface whitespace-pre-wrap break-words py-3 font-mono">
             {{ truncateText(node.message.content, 500) }}
           </p>
-          <p v-else-if="!node.message.toolCalls?.length && !node.message.toolResult" data-name="message-no-content" class="text-sm text-muted italic py-3">
+          <p v-else-if="!node.message.toolCalls?.length && !node.message.toolResult" data-name="message-no-content" class="text-sm text-on-surface-variant italic py-3">
             (no content)
           </p>
 
@@ -218,7 +218,7 @@ function summarizeArgs(args: Record<string, unknown>): string {
                   v-for="call in group.calls"
                   :key="call.id"
                   :data-name="`tool-call-${call.id}`"
-                  class="px-2 py-1 text-xs font-mono text-secondary truncate"
+                  class="px-2 py-1 text-xs font-mono text-on-surface-variant truncate"
                   :title="summarizeArgs(call.arguments)"
                 >
                   {{ summarizeArgs(call.arguments) }}
@@ -259,7 +259,7 @@ function summarizeArgs(args: Record<string, unknown>): string {
       </div>
     </div>
 
-    <div v-if="flattenedNodes.length === 0" data-name="timeline-empty" class="text-center text-muted py-8">
+    <div v-if="flattenedNodes.length === 0" data-name="timeline-empty" class="text-center text-on-surface-variant py-8">
       No messages in this session
     </div>
   </div>
