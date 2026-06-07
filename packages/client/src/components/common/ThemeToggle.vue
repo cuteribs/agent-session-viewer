@@ -5,9 +5,9 @@ const { isDark, toggleTheme } = useTheme()
 </script>
 
 <template>
-  <button
+    <button
     @click="toggleTheme"
-    class="p-2 rounded-lg hover:bg-tertiary transition-colors"
+    class="p-2 rounded-lg hover:bg-surface-container-high transition-colors"
     :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
   >
     <!-- Sun icon (light mode) -->

@@ -256,22 +256,22 @@ function formatTime(timestamp: string): string {
   <div data-name="charts-view" class="space-y-8">
     <!-- Token Stats Summary -->
     <div v-if="session.stats.tokens" data-name="token-stats-grid" class="grid gap-4" :class="session.stats.tokens.totalCost != null && session.stats.tokens.totalCost > 0 ? 'grid-cols-5' : 'grid-cols-4'">
-      <div data-name="stat-total-input" class="bg-primary rounded-lg p-4 border border-default">
-        <p class="text-sm text-muted">Total Input</p>
-        <p class="text-2xl font-bold text-primary">{{ session.stats.tokens.totalInput.toLocaleString() }}</p>
+      <div data-name="stat-total-input" class="bg-surface rounded-lg p-4 border border-outline-variant">
+        <p class="text-sm text-on-surface-variant">Total Input</p>
+        <p class="text-2xl font-bold text-on-surface">{{ session.stats.tokens.totalInput.toLocaleString() }}</p>
       </div>
-      <div data-name="stat-total-output" class="bg-primary rounded-lg p-4 border border-default">
-        <p class="text-sm text-muted">Total Output</p>
-        <p class="text-2xl font-bold text-primary">{{ session.stats.tokens.totalOutput.toLocaleString() }}</p>
+      <div data-name="stat-total-output" class="bg-surface rounded-lg p-4 border border-outline-variant">
+        <p class="text-sm text-on-surface-variant">Total Output</p>
+        <p class="text-2xl font-bold text-on-surface">{{ session.stats.tokens.totalOutput.toLocaleString() }}</p>
       </div>
-      <div data-name="stat-cache-read" class="bg-primary rounded-lg p-4 border border-default">
-        <p class="text-sm text-muted">Cache Read</p>
-        <p class="text-2xl font-bold text-primary">{{ session.stats.tokens.totalCacheRead.toLocaleString() }}</p>
-        <p class="text-xs text-muted mt-1">peak cached context</p>
+      <div data-name="stat-cache-read" class="bg-surface rounded-lg p-4 border border-outline-variant">
+        <p class="text-sm text-on-surface-variant">Cache Read</p>
+        <p class="text-2xl font-bold text-on-surface">{{ session.stats.tokens.totalCacheRead.toLocaleString() }}</p>
+        <p class="text-xs text-on-surface-variant mt-1">peak cached context</p>
       </div>
-      <div data-name="stat-cache-creation" class="bg-primary rounded-lg p-4 border border-default">
-        <p class="text-sm text-muted">Cache Creation</p>
-        <p class="text-2xl font-bold text-primary">{{ session.stats.tokens.totalCacheCreation.toLocaleString() }}</p>
+      <div data-name="stat-cache-creation" class="bg-surface rounded-lg p-4 border border-outline-variant">
+        <p class="text-sm text-on-surface-variant">Cache Creation</p>
+        <p class="text-2xl font-bold text-on-surface">{{ session.stats.tokens.totalCacheCreation.toLocaleString() }}</p>
       </div>
       <!-- Total Cost card (only shown when pricing is known) -->
       <div
@@ -279,9 +279,9 @@ function formatTime(timestamp: string): string {
         data-name="stat-total-cost"
         class="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-800"
       >
-        <p class="text-sm text-muted">Total Cost</p>
+        <p class="text-sm text-on-surface-variant">Total Cost</p>
         <p class="text-2xl font-bold text-green-700 dark:text-green-400">{{ formatCost(session.stats.tokens.totalCost) }}</p>
-        <p class="text-xs text-muted mt-1">exact · USD</p>
+        <p class="text-xs text-on-surface-variant mt-1">exact · USD</p>
       </div>
     </div>
 
@@ -313,16 +313,16 @@ function formatTime(timestamp: string): string {
     </div>
 
     <!-- Token Usage Over Time -->
-    <div v-if="tokenChartData" data-name="chart-token-usage" class="bg-primary rounded-lg p-4 border border-default">
-      <h3 class="text-lg font-semibold mb-4 text-primary">Token Usage Per Message</h3>
+    <div v-if="tokenChartData" data-name="chart-token-usage" class="bg-surface rounded-lg p-4 border border-outline-variant">
+      <h3 class="text-lg font-semibold mb-4 text-on-surface">Token Usage Per Message</h3>
       <div class="h-64">
         <Line :data="tokenChartData" :options="tokenChartOptions" />
       </div>
     </div>
 
     <!-- Cumulative Tokens -->
-    <div v-if="cumulativeChartData" data-name="chart-cumulative-tokens" class="bg-primary rounded-lg p-4 border border-default">
-      <h3 class="text-lg font-semibold mb-4 text-primary">Cumulative Token Usage</h3>
+    <div v-if="cumulativeChartData" data-name="chart-cumulative-tokens" class="bg-surface rounded-lg p-4 border border-outline-variant">
+      <h3 class="text-lg font-semibold mb-4 text-on-surface">Cumulative Token Usage</h3>
       <div class="h-64">
         <Line :data="cumulativeChartData" :options="tokenChartOptions" />
       </div>
@@ -330,33 +330,33 @@ function formatTime(timestamp: string): string {
 
     <div data-name="charts-bottom-row" class="grid grid-cols-2 gap-4">
       <!-- Tool Usage Chart -->
-      <div v-if="toolChartData" data-name="chart-tool-usage" class="bg-primary rounded-lg p-4 border border-default">
-        <h3 class="text-lg font-semibold mb-4 text-primary">Tool Usage</h3>
+      <div v-if="toolChartData" data-name="chart-tool-usage" class="bg-surface rounded-lg p-4 border border-outline-variant">
+        <h3 class="text-lg font-semibold mb-4 text-on-surface">Tool Usage</h3>
         <div class="h-64">
           <Bar :data="toolChartData" :options="barChartOptions" />
         </div>
       </div>
 
       <!-- Tool Summary Table -->
-      <div v-if="session.stats.tools.length > 0" data-name="tool-summary-table" class="bg-primary rounded-lg p-4 border border-default">
-        <h3 class="text-lg font-semibold mb-4 text-primary">Tool Summary</h3>
+      <div v-if="session.stats.tools.length > 0" data-name="tool-summary-table" class="bg-surface rounded-lg p-4 border border-outline-variant">
+        <h3 class="text-lg font-semibold mb-4 text-on-surface">Tool Summary</h3>
         <div class="h-64 overflow-y-auto">
           <table class="w-full">
-            <thead class="bg-tertiary sticky top-0 z-10">
+            <thead class="bg-surface-container-high sticky top-0 z-10">
               <tr>
-                <th class="bg-tertiary text-left px-3 py-2 text-sm font-medium text-muted">Tool</th>
-                <th class="bg-tertiary text-right px-3 py-2 text-sm font-medium text-muted">Count</th>
-                <th class="bg-tertiary text-right px-3 py-2 text-sm font-medium text-muted">Success</th>
+                <th class="bg-surface-container-high text-left px-3 py-2 text-sm font-medium text-on-surface-variant">Tool</th>
+                <th class="bg-surface-container-high text-right px-3 py-2 text-sm font-medium text-on-surface-variant">Count</th>
+                <th class="bg-surface-container-high text-right px-3 py-2 text-sm font-medium text-on-surface-variant">Success</th>
               </tr>
             </thead>
             <tbody>
               <tr
                 v-for="tool in session.stats.tools"
                 :key="tool.name"
-                class="border-t border-default"
+                class="border-t border-outline-variant"
               >
-                <td class="px-3 py-2 text-sm text-primary">{{ tool.name }}</td>
-                <td class="text-right px-3 py-2 text-sm text-primary">{{ tool.count }}</td>
+                <td class="px-3 py-2 text-sm text-on-surface">{{ tool.name }}</td>
+                <td class="text-right px-3 py-2 text-sm text-on-surface">{{ tool.count }}</td>
                 <td class="text-right px-3 py-2 text-sm">
                   <span
                     :class="[
@@ -378,37 +378,37 @@ function formatTime(timestamp: string): string {
       </div>
 
       <!-- Placeholder if no tools -->
-      <div v-else data-name="tool-summary-empty" class="bg-primary rounded-lg p-4 border border-default">
-        <h3 class="text-lg font-semibold mb-4 text-primary">Tool Summary</h3>
-        <div class="h-64 flex items-center justify-center text-muted">
+      <div v-else data-name="tool-summary-empty" class="bg-surface rounded-lg p-4 border border-outline-variant">
+        <h3 class="text-lg font-semibold mb-4 text-on-surface">Tool Summary</h3>
+        <div class="h-64 flex items-center justify-center text-on-surface-variant">
           <p>No tool usage data</p>
         </div>
       </div>
     </div>
 
     <!-- Tool Usage Details Table -->
-    <div v-if="allToolCalls.length > 0" data-name="tool-details-table" class="bg-primary rounded-lg border border-default overflow-hidden">
-      <h3 class="text-lg font-semibold p-4 border-b border-default text-primary">
+    <div v-if="allToolCalls.length > 0" data-name="tool-details-table" class="bg-surface rounded-lg border border-outline-variant overflow-hidden">
+      <h3 class="text-lg font-semibold p-4 border-b border-outline-variant text-on-surface">
         Tool Usage Details
-        <span class="text-sm font-normal text-muted ml-2">({{ allToolCalls.length }} calls)</span>
+        <span class="text-sm font-normal text-on-surface-variant ml-2">({{ allToolCalls.length }} calls)</span>
       </h3>
       <div class="overflow-x-auto max-h-96 overflow-y-auto">
         <table class="w-full">
-          <thead class="bg-tertiary sticky top-0 z-10">
+          <thead class="bg-surface-container-high sticky top-0 z-10">
             <tr>
-              <th class="bg-tertiary text-left px-4 py-2 text-sm font-medium text-muted">#</th>
-              <th class="bg-tertiary text-left px-4 py-2 text-sm font-medium text-muted">Tool</th>
-              <th class="bg-tertiary text-left px-4 py-2 text-sm font-medium text-muted">Parameters</th>
-              <th class="bg-tertiary text-right px-4 py-2 text-sm font-medium text-muted">Time</th>
+              <th class="bg-surface-container-high text-left px-4 py-2 text-sm font-medium text-on-surface-variant">#</th>
+              <th class="bg-surface-container-high text-left px-4 py-2 text-sm font-medium text-on-surface-variant">Tool</th>
+              <th class="bg-surface-container-high text-left px-4 py-2 text-sm font-medium text-on-surface-variant">Parameters</th>
+              <th class="bg-surface-container-high text-right px-4 py-2 text-sm font-medium text-on-surface-variant">Time</th>
             </tr>
           </thead>
           <tbody>
             <tr
               v-for="(call, index) in allToolCalls"
               :key="`${call.toolName}-${index}`"
-              class="border-t border-default hover:bg-tertiary/30"
+              class="border-t border-outline-variant hover:bg-surface-container/50"
             >
-              <td class="px-4 py-2 text-sm text-muted">{{ call.messageIndex }}</td>
+              <td class="px-4 py-2 text-sm text-on-surface-variant">{{ call.messageIndex }}</td>
               <td class="px-4 py-2">
                 <span class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 rounded font-medium">
                   {{ call.toolName }}
@@ -421,15 +421,15 @@ function formatTime(timestamp: string): string {
                     :key="param.key"
                     class="text-sm"
                   >
-                    <span class="text-muted">{{ param.key }}:</span>
-                    <code class="ml-1 px-1.5 py-0.5 bg-tertiary rounded text-xs text-primary break-all">{{ param.value }}</code>
+                    <span class="text-on-surface-variant">{{ param.key }}:</span>
+                    <code class="ml-1 px-1.5 py-0.5 bg-surface-container-high rounded text-xs text-on-surface break-all">{{ param.value }}</code>
                   </div>
-                  <div v-if="call.params.length === 0" class="text-sm text-muted italic">
+                  <div v-if="call.params.length === 0" class="text-sm text-on-surface-variant italic">
                     (no parameters)
                   </div>
                 </div>
               </td>
-              <td class="px-4 py-2 text-right text-sm text-muted whitespace-nowrap">
+              <td class="px-4 py-2 text-right text-sm text-on-surface-variant whitespace-nowrap">
                 {{ formatTime(call.timestamp) }}
               </td>
             </tr>
@@ -439,7 +439,7 @@ function formatTime(timestamp: string): string {
     </div>
 
     <!-- No token data message -->
-    <div v-if="!session.stats.tokens" data-name="no-token-data" class="bg-primary rounded-lg p-8 border border-default text-center text-muted">
+    <div v-if="!session.stats.tokens" data-name="no-token-data" class="bg-surface rounded-lg p-8 border border-outline-variant text-center text-on-surface-variant">
       <p>No token usage data available for this session.</p>
       <p class="text-sm mt-1">Token tracking is only available for Claude Code sessions.</p>
     </div>

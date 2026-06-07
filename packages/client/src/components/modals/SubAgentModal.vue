@@ -147,11 +147,11 @@ function renderMarkdown(content: string): string {
         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
         @click.self="close"
       >
-        <div class="bg-primary rounded-lg shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
-          <div class="flex items-center justify-between px-4 py-3 border-b border-default">
+        <div class="bg-surface rounded-lg shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-outline-variant">
             <div>
               <div class="flex items-center gap-2 flex-wrap">
-                <span class="text-sm font-semibold text-primary">{{ agent.agentId }}</span>
+                <span class="text-sm font-semibold text-on-surface">{{ agent.agentId }}</span>
                 <span class="text-xs px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">{{ agent.agentType }}</span>
                 <span
                   class="text-xs px-2 py-0.5 rounded"
@@ -160,41 +160,41 @@ function renderMarkdown(content: string): string {
                   {{ agent.status }}
                 </span>
               </div>
-              <p v-if="agent.agentDisplayName && agent.agentDisplayName !== agent.agentId" class="text-xs text-muted mt-1">
+              <p v-if="agent.agentDisplayName && agent.agentDisplayName !== agent.agentId" class="text-xs text-on-surface-variant mt-1">
                 {{ agent.agentDisplayName }}
               </p>
             </div>
-            <button @click="close" class="p-1 rounded hover:bg-tertiary">
+            <button @click="close" class="p-1 rounded hover:bg-surface-container-high">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
 
-          <div class="flex flex-wrap items-center gap-4 px-4 py-2 bg-tertiary/50 border-b border-default text-xs text-muted">
-            <span v-if="agent.model">Model: <span class="text-primary font-medium">{{ agent.model }}</span></span>
-            <span v-if="agent.totalTokens">Tokens: <span class="text-primary font-medium">{{ formatTokens(agent.totalTokens) }}</span></span>
-            <span v-if="agent.totalToolCalls">Tool calls: <span class="text-primary font-medium">{{ agent.totalToolCalls }}</span></span>
-            <span v-if="agent.durationMs">Duration: <span class="text-primary font-medium">{{ durationFormatted(agent.durationMs) }}</span></span>
+          <div class="flex flex-wrap items-center gap-4 px-4 py-2 bg-surface-container-high/50 border-b border-outline-variant text-xs text-on-surface-variant">
+            <span v-if="agent.model">Model: <span class="text-on-surface font-medium">{{ agent.model }}</span></span>
+            <span v-if="agent.totalTokens">Tokens: <span class="text-on-surface font-medium">{{ formatTokens(agent.totalTokens) }}</span></span>
+            <span v-if="agent.totalToolCalls">Tool calls: <span class="text-on-surface font-medium">{{ agent.totalToolCalls }}</span></span>
+            <span v-if="agent.durationMs">Duration: <span class="text-on-surface font-medium">{{ durationFormatted(agent.durationMs) }}</span></span>
           </div>
 
           <div class="flex-1 overflow-y-auto p-4 space-y-4">
             <div v-if="agent.description">
-              <p class="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Description</p>
-              <p class="text-sm text-secondary">{{ agent.description }}</p>
+              <p class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Description</p>
+              <p class="text-sm text-on-surface-variant">{{ agent.description }}</p>
             </div>
 
             <details v-if="agent.prompt" open>
-              <summary class="text-xs font-semibold text-muted uppercase tracking-wider cursor-pointer">Prompt</summary>
-              <pre class="text-xs text-secondary bg-tertiary rounded-lg p-3 overflow-auto max-h-48 whitespace-pre-wrap font-sans mt-2">{{ agent.prompt }}</pre>
+              <summary class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider cursor-pointer">Prompt</summary>
+              <pre class="text-xs text-on-surface-variant bg-surface-container-high rounded-lg p-3 overflow-auto max-h-48 whitespace-pre-wrap font-sans mt-2">{{ agent.prompt }}</pre>
             </details>
 
             <div v-if="agent.result">
-              <p class="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Result</p>
-              <div class="markdown-content text-sm text-secondary bg-tertiary rounded-lg p-3 overflow-auto max-h-64" v-html="renderedResult" />
+              <p class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Result</p>
+              <div class="markdown-content text-sm text-on-surface-variant bg-surface-container-high rounded-lg p-3 overflow-auto max-h-64" v-html="renderedResult" />
             </div>
 
-            <div v-if="!agent.prompt && !agent.result && !agent.description" class="text-sm text-muted italic">
+            <div v-if="!agent.prompt && !agent.result && !agent.description" class="text-sm text-on-surface-variant italic">
               No content available
             </div>
           </div>

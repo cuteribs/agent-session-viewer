@@ -15,5 +15,5 @@ export type {
 
 // Client-specific types
 export type ViewMode = 'timeline' | 'charts' | 'logfile'
-export type ListViewMode = 'date' | 'project'
+export type ListViewMode = 'date' | 'project' | 'wilder'
 export type Theme = 'light' | 'dark' | 'system'

@@ -1,85 +1,100 @@
 <script setup lang="ts">
 import { useSessionsStore } from '@/stores/sessions'
-import SearchBar from '@/components/common/SearchBar.vue'
-import ThemeToggle from '@/components/common/ThemeToggle.vue'
+import { useTheme } from '@/composables/useTheme'
 
 const sessionsStore = useSessionsStore()
+const { toggleTheme } = useTheme()
+
+const sourceOptions = [
+  { value: 'all', label: 'All Agents' },
+  { value: 'claude', label: 'Claude Code' },
+  { value: 'copilot', label: 'Copilot CLI' },
+  { value: 'codex', label: 'Codex' },
+  { value: 'opencode', label: 'OpenCode' },
+  { value: 'vscode', label: 'VSCode Chat' },
+] as const
+
+function handleSourceChange(e: Event) {
+  const val = (e.target as HTMLSelectElement).value
+  sessionsStore.setSourceFilter(val as any)
+}
 </script>
 
 <template>
-  <header class="h-16 bg-primary border-b border-default flex items-center px-4 gap-4">
+  <header class="bg-surface border-b border-outline-variant flex justify-between items-center w-full px-gutter h-16 shrink-0 z-50">
     <!-- Logo -->
-    <div class="flex items-center gap-2">
-      <svg
-        class="w-8 h-8 text-accent"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
-        />
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9h8" />
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 13h6" />
-      </svg>
-      <h1 class="text-lg font-semibold text-primary hidden sm:block">Agent Session Viewer</h1>
-    </div>
-
-    <!-- Search -->
-    <div class="flex-1 max-w-xl">
-      <SearchBar
-        :model-value="sessionsStore.searchQuery"
-        @update:model-value="sessionsStore.setSearchQuery"
-        placeholder="Search sessions..."
-      />
+    <div class="flex items-center gap-stack-md">
+      <span
+        class="material-symbols-outlined text-primary text-2xl"
+        style="font-variation-settings: 'FILL' 1"
+      >terminal</span>
+      <span class="font-headline-md text-headline-md font-bold text-primary hidden sm:block">
+        Agent Session Viewer
+      </span>
     </div>
 
     <!-- Right side actions -->
-    <div class="flex items-center gap-2">
-      <!-- Realtime watch toggle -->
+    <div class="flex items-center gap-stack-sm">
+      <!-- Agent filter dropdown -->
+      <div class="relative hidden lg:block mr-2">
+        <select
+          :value="sessionsStore.sourceFilter"
+          @change="handleSourceChange"
+          class="appearance-none bg-surface-container border border-outline-variant rounded-DEFAULT py-1 pl-3 pr-8 text-body-sm font-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary cursor-pointer"
+        >
+          <option
+            v-for="opt in sourceOptions"
+            :key="opt.value"
+            :value="opt.value"
+          >{{ opt.label }}</option>
+        </select>
+        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-on-surface-variant">
+          <span class="material-symbols-outlined text-sm" style="font-size:18px">expand_more</span>
+        </div>
+      </div>
+
+      <!-- Language button (placeholder) -->
       <button
-        @click="sessionsStore.toggleWatch()"
-        :disabled="sessionsStore.watchLoading"
-        :title="sessionsStore.watchEnabled ? 'Live updates ON — click to disable' : 'Live updates OFF — click to enable'"
-        class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
-        :class="sessionsStore.watchEnabled
-          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50'
-          : 'bg-tertiary text-muted hover:bg-quaternary'"
+        class="p-1.5 text-on-surface-variant hover:text-primary transition-colors cursor-pointer rounded-DEFAULT hover:bg-surface-container-high"
+        title="Language"
       >
-        <!-- Pulse dot when active -->
-        <span
-          class="w-2 h-2 rounded-full flex-shrink-0"
-          :class="sessionsStore.watchEnabled ? 'bg-green-500 animate-pulse' : 'bg-gray-400 dark:bg-gray-600'"
-        />
-        <span>{{ sessionsStore.watchEnabled ? 'Live' : 'Offline' }}</span>
+        <span class="material-symbols-outlined" style="font-size:20px">language</span>
       </button>
 
-      <ThemeToggle />
+      <!-- Theme toggle -->
+      <button
+        @click="toggleTheme"
+        class="p-1.5 text-on-surface-variant hover:text-primary transition-colors cursor-pointer rounded-DEFAULT hover:bg-surface-container-high"
+        title="Toggle theme"
+      >
+        <span class="material-symbols-outlined" style="font-size:20px">contrast</span>
+      </button>
 
-      <!-- Settings button -->
+      <!-- Settings -->
       <button
         @click="sessionsStore.openSettings()"
-        class="p-2 rounded-lg hover:bg-tertiary transition-colors"
+        class="p-1.5 text-on-surface-variant hover:text-primary transition-colors cursor-pointer rounded-DEFAULT hover:bg-surface-container-high"
         title="Settings"
       >
-        <svg class="w-5 h-5 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-          />
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-          />
-        </svg>
+        <span class="material-symbols-outlined" style="font-size:20px">settings</span>
       </button>
+
+      <div class="h-8 w-px bg-outline-variant mx-2"></div>
+
+      <!-- Live Monitor toggle -->
+      <div class="flex items-center gap-2">
+        <span class="font-label-caps text-label-caps text-on-surface-variant hidden sm:block">LIVE</span>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            class="sr-only peer"
+            :checked="sessionsStore.watchEnabled"
+            :disabled="sessionsStore.watchLoading"
+            @change="sessionsStore.toggleWatch()"
+          />
+          <div class="w-9 h-5 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+        </label>
+      </div>
     </div>
   </header>
 </template>

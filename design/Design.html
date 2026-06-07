@@ -1,0 +1,347 @@
+<!doctype html>
+<html
+  class="light"
+  lang="en"
+>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      content="width=device-width, initial-scale=1.0"
+      name="viewport"
+    />
+    <title>Agent Session Viewer</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@400;450&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              'on-secondary': '#ffffff',
+              'surface-container-lowest': '#ffffff',
+              'primary-fixed': '#e2dfff',
+              'primary-fixed-dim': '#c3c0ff',
+              'on-tertiary-container': '#d9d8ff',
+              'on-surface-variant': '#464555',
+              'surface-variant': '#e0e3e5',
+              'on-secondary-fixed': '#131b2e',
+              'on-secondary-container': '#5c647a',
+              surface: '#f7f9fb',
+              'on-error-container': '#93000a',
+              error: '#ba1a1a',
+              'secondary-fixed-dim': '#bec6e0',
+              secondary: '#565e74',
+              'on-surface': '#191c1e',
+              'on-primary-container': '#dad7ff',
+              'tertiary-fixed': '#e1e0ff',
+              'tertiary-container': '#4b4dd8',
+              'surface-tint': '#4d44e3',
+              'surface-container': '#eceef0',
+              'on-primary': '#ffffff',
+              'secondary-fixed': '#dae2fd',
+              'on-tertiary-fixed-variant': '#2f2ebe',
+              'on-tertiary': '#ffffff',
+              'surface-container-low': '#f2f4f6',
+              'outline-variant': '#c7c4d8',
+              'surface-container-highest': '#e0e3e5',
+              'on-tertiary-fixed': '#07006c',
+              primary: '#3525cd',
+              'tertiary-fixed-dim': '#c0c1ff',
+              'error-container': '#ffdad6',
+              'surface-bright': '#f7f9fb',
+              'primary-container': '#4f46e5',
+              'on-primary-fixed-variant': '#3323cc',
+              'on-background': '#191c1e',
+              outline: '#777587',
+              tertiary: '#3130c0',
+              'surface-dim': '#d8dadc',
+              'on-primary-fixed': '#0f0069',
+              'inverse-surface': '#2d3133',
+              background: '#f7f9fb',
+              'surface-container-high': '#e6e8ea',
+              'on-secondary-fixed-variant': '#3f465c',
+              'on-error': '#ffffff',
+              'inverse-on-surface': '#eff1f3',
+              'secondary-container': '#dae2fd',
+              'inverse-primary': '#c3c0ff',
+            },
+            borderRadius: {
+              DEFAULT: '0.125rem',
+              lg: '0.25rem',
+              xl: '0.5rem',
+              full: '0.75rem',
+            },
+            spacing: {
+              'stack-sm': '8px',
+              'sidebar-collapsed': '64px',
+              gutter: '16px',
+              base: '4px',
+              'stack-md': '16px',
+              'container-padding': '24px',
+              'sidebar-width': '260px',
+            },
+            fontFamily: {
+              'body-md': ['Inter'],
+              'label-caps': ['Inter'],
+              'code-sm': ['JetBrains Mono'],
+              'headline-sm': ['Inter'],
+              'headline-md': ['Inter'],
+              'body-sm': ['Inter'],
+              'headline-lg': ['Inter'],
+              'code-md': ['JetBrains Mono'],
+            },
+            fontSize: {
+              'body-md': ['14px', { lineHeight: '20px', fontWeight: '400' }],
+              'label-caps': ['11px', { lineHeight: '16px', letterSpacing: '0.05em', fontWeight: '700' }],
+              'code-sm': ['12px', { lineHeight: '18px', fontWeight: '400' }],
+              'headline-sm': ['16px', { lineHeight: '24px', fontWeight: '600' }],
+              'headline-md': ['20px', { lineHeight: '28px', letterSpacing: '-0.01em', fontWeight: '600' }],
+              'body-sm': ['13px', { lineHeight: '18px', fontWeight: '400' }],
+              'headline-lg': ['24px', { lineHeight: '32px', letterSpacing: '-0.02em', fontWeight: '600' }],
+              'code-md': ['13px', { lineHeight: '20px', fontWeight: '450' }],
+            },
+          },
+        },
+      };
+    </script>
+  </head>
+  <body class="bg-background text-on-background font-body-md h-screen flex flex-col overflow-hidden">
+    <!-- TopNavBar -->
+    <header
+      class="bg-surface dark:bg-inverse-surface border-b border-outline-variant dark:border-outline docked full-width top-0 flex justify-between items-center w-full px-gutter h-16 shrink-0 z-50"
+    >
+      <div class="flex items-center gap-stack-md">
+        <span
+          class="material-symbols-outlined text-primary dark:text-inverse-primary text-2xl"
+          style="font-variation-settings: 'FILL' 1"
+          >terminal</span
+        >
+        <span class="font-headline-md text-headline-md font-bold text-primary dark:text-inverse-primary">Agent Session Viewer</span>
+      </div>
+      <div class="flex items-center gap-stack-sm">
+        <!-- Agent Selection Dropdown -->
+        <div class="relative hidden lg:block mr-4">
+          <select
+            class="appearance-none bg-surface-container border border-outline-variant rounded-DEFAULT py-1 pl-3 pr-8 text-body-sm font-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary cursor-pointer"
+          >
+            <option>Claude Code</option>
+            <option>OpenCode</option>
+            <option>Codex</option>
+            <option>Copilot CLI</option>
+            <option>VSCode Chat</option>
+          </select>
+          <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-on-surface-variant">
+            <span class="material-symbols-outlined text-sm">expand_more</span>
+          </div>
+        </div>
+        <!-- Trailing Icon Actions -->
+        <button
+          class="p-1.5 text-on-surface-variant hover:text-primary transition-colors cursor-pointer active:opacity-80 rounded-DEFAULT hover:bg-surface-container-high"
+          title="Language"
+        >
+          <span class="material-symbols-outlined">language</span>
+        </button>
+        <button
+          class="p-1.5 text-on-surface-variant hover:text-primary transition-colors cursor-pointer active:opacity-80 rounded-DEFAULT hover:bg-surface-container-high"
+          title="Theme"
+        >
+          <span class="material-symbols-outlined">contrast</span>
+        </button>
+        <button
+          class="p-1.5 text-on-surface-variant hover:text-primary transition-colors cursor-pointer active:opacity-80 rounded-DEFAULT hover:bg-surface-container-high"
+          title="Settings"
+        >
+          <span class="material-symbols-outlined">settings</span>
+        </button>
+        <div class="h-8 w-px bg-outline-variant mx-2"></div>
+        <div class="flex items-center gap-2">
+          <span class="font-label-caps text-label-caps text-on-surface-variant">LIVE MONITOR</span>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input
+              checked=""
+              class="sr-only peer"
+              type="checkbox"
+              value=""
+            />
+            <div
+              class="w-9 h-5 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"
+            ></div>
+          </label>
+        </div>
+        <img
+          alt="User profile"
+          class="w-8 h-8 rounded-full ml-2 border border-outline-variant"
+          data-alt="A small circular user profile avatar with a deep indigo blue background and clean white initials, styled in a minimalist professional aesthetic."
+          src="https://api.dicebear.com/10.x/initials/svg?backgroundColor=c44f4f,ac6039,8e6e2f,777728,627e2a,48822b,2d862d,2b8248,2b8265,2a7e7e,347a9d,6a6acd,825ec9,9f53c6,bb3ebb,c14497,c34b73&lettersProbability=100&initialsVariant=alt:1&seed=EF"
+        />
+      </div>
+    </header>
+    <div class="flex flex-1 overflow-hidden">
+      <!-- SideNavBar -->
+      <aside
+        class="bg-surface-container dark:bg-inverse-surface docked hidden md:flex flex-col h-full w-sidebar-width shrink-0 border-r border-outline-variant z-40"
+      >
+        <div class="px-gutter py-3 border-b border-outline-variant flex flex-col gap-2">
+          <div class="relative">
+            <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
+            <input
+              class="w-full bg-surface-container-highest border border-outline-variant rounded-DEFAULT py-1.5 pl-8 pr-2 text-body-sm font-body-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+              placeholder="Search sessions..."
+              type="text"
+            />
+          </div>
+          <div class="flex justify-between items-center px-1">
+            <span class="font-label-caps text-label-caps text-on-surface-variant">SORT BY</span>
+            <select class="bg-transparent text-body-sm font-body-sm text-on-surface-variant border-none p-0 focus:ring-0 cursor-pointer">
+              <option>Date</option>
+              <option>Project</option>
+              <option>Wilder</option>
+            </select>
+          </div>
+        </div>
+        <nav class="flex-1 overflow-y-auto py-2">
+          <!-- Session List Items -->
+          <div class="px-4 py-2 mt-4">
+            <h3 class="font-label-caps text-label-caps text-on-surface-variant mb-2">RECENT</h3>
+            <ul class="flex flex-col gap-1">
+              <!-- Session Item 1 (Active) -->
+              <li
+                class="bg-surface border border-outline-variant rounded-lg p-2 cursor-pointer hover:border-primary transition-colors border-l-4 border-l-primary"
+              >
+                <div class="flex flex-col gap-1">
+                  <!-- Line 1: Project Name -->
+                  <div class="font-body-sm text-body-sm font-bold text-on-surface truncate">frontend-refactor</div>
+                  <!-- Line 2: Session ID and Time -->
+                  <div class="flex justify-between items-center">
+                    <span class="font-code-sm text-code-sm text-on-surface-variant">a7b2e9c1</span>
+                    <span class="font-body-sm text-[10px] text-on-surface-variant">10m ago</span>
+                  </div>
+                  <!-- Line 3: Messages and Tokens -->
+                  <div class="flex justify-between items-center">
+                    <span class="font-label-caps text-[10px] text-on-surface-variant">42 MESSAGES</span>
+                    <span class="font-label-caps text-[10px] text-on-surface-variant">14K TOKENS</span>
+                  </div>
+                  <!-- Line 4: Subagents Expand -->
+                  <div class="flex items-center justify-between bg-surface-container-low rounded px-1.5 py-1 mt-0.5">
+                    <span class="font-label-caps text-[10px] text-on-surface-variant">2 SUBAGENTS</span>
+                    <span class="material-symbols-outlined text-on-surface-variant text-sm">expand_more</span>
+                  </div>
+                </div>
+              </li>
+              <!-- Session Item 2 -->
+              <li
+                class="bg-surface border border-outline-variant rounded-lg p-2 cursor-pointer hover:border-primary transition-colors border-l-4 border-l-transparent"
+              >
+                <div class="flex flex-col gap-1">
+                  <!-- Line 1: Project Name -->
+                  <div class="font-body-sm text-body-sm font-bold text-on-surface truncate">api-integration</div>
+                  <!-- Line 2: Session ID and Time -->
+                  <div class="flex justify-between items-center">
+                    <span class="font-code-sm text-code-sm text-on-surface-variant">f39d2a01</span>
+                    <span class="font-body-sm text-[10px] text-on-surface-variant">2h ago</span>
+                  </div>
+                  <!-- Line 3: Messages and Tokens -->
+                  <div class="flex justify-between items-center">
+                    <span class="font-label-caps text-[10px] text-on-surface-variant">12 MESSAGES</span>
+                    <span class="font-label-caps text-[10px] text-on-surface-variant">3.2K TOKENS</span>
+                  </div>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </nav>
+      </aside>
+      <!-- Main Content Canvas -->
+      <main class="flex-1 flex flex-col bg-surface min-w-0 overflow-hidden relative">
+        <!-- Header Summary Panel -->
+        <div class="bg-surface p-container-padding border-b border-outline-variant shrink-0 relative z-10 shadow-sm">
+          <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 rounded-xl bg-secondary-container flex items-center justify-center text-primary">
+                <span class="material-symbols-outlined text-3xl">smart_toy</span>
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h1 class="font-headline-lg text-headline-lg text-on-surface">Claude Code</h1>
+                  <span class="bg-surface-container-highest text-on-surface-variant font-label-caps text-label-caps px-2 py-0.5 rounded-DEFAULT">ACTIVE</span>
+                </div>
+                <div class="flex items-center gap-2 mt-1 text-on-surface-variant font-body-sm text-body-sm">
+                  <span class="font-semibold text-on-surface">frontend-refactor</span>
+                  <span class="">•</span>
+                  <span class="font-code-sm text-code-sm bg-surface-container px-1.5 py-0.5 rounded-DEFAULT">~/dev/projects/webapp/src</span>
+                </div>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-x-6 gap-y-2 lg:justify-end">
+              <div class="flex flex-col">
+                <span class="font-label-caps text-label-caps text-on-surface-variant">SESSION ID</span>
+                <span class="font-code-md text-code-md text-on-surface">ac41f562-7792-44ba-b080-c48faeec8e33</span>
+              </div>
+              <div class="flex flex-col">
+                <span class="font-label-caps text-label-caps text-on-surface-variant">MODEL</span>
+                <select
+                  class="appearance-none bg-transparent border-none p-0 pr-4 font-body-sm text-body-sm font-semibold text-primary focus:ring-0 cursor-pointer relative bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%233525cd%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-no-repeat bg-right"
+                >
+                  <option>claude-3-5-sonnet</option>
+                  <option>claude-3-opus</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <!-- Metrics Bento Box -->
+          <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-3">
+              <span class="font-label-caps text-label-caps text-on-surface-variant block mb-1">MESSAGES</span>
+              <span class="font-headline-md text-headline-md text-on-surface">42</span>
+            </div>
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-3">
+              <span class="font-label-caps text-label-caps text-on-surface-variant block mb-1">TOTAL TOKENS</span>
+              <span class="font-code-md text-code-md text-on-surface">14,285</span>
+            </div>
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-3">
+              <span class="font-label-caps text-label-caps text-on-surface-variant block mb-1">DURATION</span>
+              <span class="font-headline-md text-headline-md text-on-surface">1m 12s</span>
+            </div>
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-3">
+              <span class="font-label-caps text-label-caps text-on-surface-variant block mb-1">STARTED</span>
+              <span class="font-code-sm text-code-sm text-on-surface block">2026-12-12 14:32:01</span>
+            </div>
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-3 flex flex-col justify-between">
+              <span class="font-label-caps text-label-caps text-on-surface-variant block mb-1">COST EST.</span>
+              <div class="flex items-baseline gap-1">
+                <span class="font-headline-md text-headline-md text-primary">$0.14</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Content Tabs -->
+        <div class="px-container-padding border-b border-outline-variant bg-surface shrink-0 z-10">
+          <div class="flex gap-stack-md">
+            <button class="font-headline-sm text-headline-sm text-primary border-b-2 border-primary py-3 px-2 flex items-center gap-2">
+              <span class="material-symbols-outlined text-[18px]">view_timeline</span> Timeline
+            </button>
+            <button
+              class="font-headline-sm text-headline-sm text-on-surface-variant hover:text-on-surface py-3 px-2 flex items-center gap-2 border-b-2 border-transparent transition-colors"
+            >
+              <span class="material-symbols-outlined text-[18px]">bar_chart</span> Chart
+            </button>
+          </div>
+        </div>
+        <!-- Timeline Canvas: ./TimelineView.html -->
+		<!-- Chart Canvas: ./ChartView.html -->
+      </main>
+    </div>
+  </body>
+</html>

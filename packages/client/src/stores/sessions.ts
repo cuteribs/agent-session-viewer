@@ -76,6 +76,25 @@ export const useSessionsStore = defineStore('sessions', () => {
     return groups
   })
 
+  // "Wilder" sort: alphabetical by session name/project
+  const sessionsByName = computed(() => {
+    const groups: Record<string, SessionSummary[]> = {}
+
+    const sorted = [...filteredSessions.value].sort((a, b) =>
+      a.project.localeCompare(b.project)
+    )
+
+    for (const session of sorted) {
+      const letter = session.project.charAt(0).toUpperCase() || '#'
+      if (!groups[letter]) {
+        groups[letter] = []
+      }
+      groups[letter].push(session)
+    }
+
+    return groups
+  })
+
   // Actions
   async function loadSessions() {
     loading.value = true
@@ -271,6 +290,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     filteredSessions,
     sessionsByDate,
     sessionsByProject,
+    sessionsByName,
     // Actions
     loadSessions,
     selectSession,

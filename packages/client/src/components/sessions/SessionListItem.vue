@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useSessionsStore } from '@/stores/sessions'
-import { formatRelativeTime, formatTokens, truncateText, getSourceBgColor } from '@/utils/formatters'
+import { formatRelativeTime, formatTokens, truncateText } from '@/utils/formatters'
 import type { SessionSummary } from '@/types'
 
 const props = defineProps<{
@@ -24,10 +24,13 @@ const subAgents = computed(() => {
   return sessionsStore.currentSession?.subAgents ?? []
 })
 
+const subAgentCount = computed(() => {
+  if (isActive.value && subAgents.value.length) return subAgents.value.length
+  return props.session.subAgentCount ?? 0
+})
+
 watch(isActive, active => {
-  if (!active) {
-    showSubAgents.value = false
-  }
+  if (!active) showSubAgents.value = false
 })
 
 function handleClick() {
@@ -51,100 +54,84 @@ function cancelDelete() {
 
 <template>
   <div :data-name="`session-item-${session.source}-${session.id.substring(0,8)}`">
-    <button
+    <!-- Session card -->
+    <li
       data-name="session-item-button"
       @click="handleClick"
       :class="[
-        'w-full text-left px-4 py-3 hover:bg-tertiary transition-colors border-l-2 relative group',
-        isActive
-          ? 'bg-tertiary border-accent'
-          : 'border-transparent'
+        'bg-surface border border-outline-variant rounded-lg p-2 cursor-pointer hover:border-primary transition-colors border-l-4 relative group mx-2 my-1',
+        isActive ? 'border-l-primary' : 'border-l-transparent'
       ]"
     >
-      <div class="flex items-start justify-between gap-2">
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2">
-            <span
-              data-name="session-item-source-dot"
-              :class="['w-2 h-2 rounded-full flex-shrink-0', getSourceBgColor(session.source)]"
-            />
-            <span data-name="session-item-project" class="font-medium text-primary truncate">
-              {{ truncateText(session.project, 30) }}
-            </span>
+      <div class="flex flex-col gap-1">
+        <!-- Line 1: Project name + delete button -->
+        <div class="flex items-center justify-between gap-1">
+          <div class="font-body-sm text-body-sm font-bold text-on-surface truncate">
+            {{ truncateText(session.project, 28) }}
           </div>
-          <p data-name="session-item-id" class="text-xs text-muted mt-1 truncate">
-            {{ session.id.substring(0, 8) }}...
-          </p>
+          <button
+            data-name="session-item-delete"
+            @click.stop="handleDelete"
+            class="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-error-container rounded transition-all flex-shrink-0"
+            title="Delete session"
+          >
+            <span class="material-symbols-outlined text-error" style="font-size:14px">delete</span>
+          </button>
         </div>
-        <div class="text-right flex-shrink-0">
-          <p data-name="session-item-time" class="text-xs text-muted">
-            {{ formatRelativeTime(session.lastActivity) }}
-          </p>
-          <div class="flex items-center gap-2 mt-1 flex-wrap justify-end">
-            <span data-name="session-item-msg-count" class="text-xs text-secondary">{{ session.messageCount }} msgs</span>
-            <span
-              v-if="!isActive && session.subAgentCount"
-              data-name="session-item-agent-count"
-              class="text-xs px-1 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded"
-              title="Has subagents"
-            >
-              {{ session.subAgentCount }} agents
-            </span>
-            <span
-              v-if="session.totalTokens"
-              data-name="session-item-tokens"
-              class="text-xs px-1.5 py-0.5 bg-tertiary rounded"
-            >
-              {{ formatTokens(session.totalTokens) }}
-            </span>
-          </div>
+
+        <!-- Line 2: Session ID + time -->
+        <div class="flex justify-between items-center">
+          <span class="font-code-sm text-code-sm text-on-surface-variant">{{ session.id.substring(0, 8) }}</span>
+          <span class="text-[10px] text-on-surface-variant">{{ formatRelativeTime(session.lastActivity) }}</span>
+        </div>
+
+        <!-- Line 3: Messages + tokens -->
+        <div class="flex justify-between items-center">
+          <span class="font-label-caps text-[10px] text-on-surface-variant">{{ session.messageCount }} MSGS</span>
+          <span v-if="session.totalTokens" class="font-label-caps text-[10px] text-on-surface-variant">
+            {{ formatTokens(session.totalTokens) }} TOKENS
+          </span>
+        </div>
+
+        <!-- Line 4: Subagents expand (only when there are subagents) -->
+        <div
+          v-if="subAgentCount"
+          @click.stop="isActive ? showSubAgents = !showSubAgents : handleClick()"
+          class="flex items-center justify-between bg-surface-container-low rounded px-1.5 py-1 mt-0.5 hover:bg-surface-container transition-colors"
+        >
+          <span class="font-label-caps text-[10px] text-on-surface-variant">{{ subAgentCount }} SUBAGENTS</span>
+          <span
+            class="material-symbols-outlined text-on-surface-variant transition-transform"
+            :class="showSubAgents ? 'rotate-180' : ''"
+            style="font-size:14px"
+          >expand_more</span>
         </div>
       </div>
+    </li>
 
-      <button
-        data-name="session-item-delete"
-        @click.stop="handleDelete"
-        class="absolute top-2 right-2 p-1 opacity-0 group-hover:opacity-100 hover:bg-red-500/20 rounded transition-all"
-        title="Delete session"
-      >
-        <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>
-      </button>
-    </button>
-
-    <button
-      v-if="isActive && subAgents.length"
-      data-name="session-item-subagents-toggle"
-      @click.stop="showSubAgents = !showSubAgents"
-      class="w-full flex items-center gap-2 px-4 py-1.5 text-xs text-secondary hover:bg-tertiary border-t border-default"
-    >
-      <svg class="w-3 h-3 transition-transform" :class="showSubAgents ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-      </svg>
-      {{ subAgents.length }} Subagent{{ subAgents.length > 1 ? 's' : '' }}
-    </button>
-
-    <div v-if="isActive && showSubAgents" data-name="session-item-subagents-list" class="border-t border-default">
+    <!-- Subagents list -->
+    <div v-if="isActive && showSubAgents && subAgents.length" data-name="session-item-subagents-list" class="mx-2 mb-1">
       <button
         v-for="agent in subAgents"
         :key="agent.id"
         :data-name="`subagent-${agent.id}`"
         @click.stop="sessionsStore.selectSubAgent(agent)"
-        class="w-full text-left flex items-center gap-2 px-5 py-2 text-xs hover:bg-tertiary transition-colors"
-        :class="sessionsStore.selectedSubAgent?.id === agent.id ? 'bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-500' : ''"
+        class="w-full text-left flex items-center gap-2 px-3 py-1.5 text-body-sm hover:bg-surface-container-high transition-colors rounded"
+        :class="sessionsStore.selectedSubAgent?.id === agent.id ? 'bg-primary-fixed text-on-primary-container' : 'text-on-surface'"
       >
-        <span class="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
+        <span class="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
         <div class="flex-1 min-w-0">
-          <span class="font-medium text-primary">{{ agent.agentId }}</span>
-          <span class="text-muted ml-1">({{ agent.agentType }})</span>
+          <span class="font-medium">{{ agent.agentId }}</span>
+          <span class="text-on-surface-variant ml-1 text-[11px]">({{ agent.agentType }})</span>
         </div>
-        <span :class="agent.status === 'completed' ? 'text-green-500' : agent.status === 'failed' ? 'text-red-500' : 'text-amber-500'" class="text-xs">
-          {{ agent.status }}
-        </span>
+        <span
+          class="text-[11px] font-medium"
+          :class="agent.status === 'completed' ? 'text-green-600' : agent.status === 'failed' ? 'text-error' : 'text-yellow-600'"
+        >{{ agent.status }}</span>
       </button>
     </div>
 
+    <!-- Delete confirmation dialog -->
     <Teleport to="body">
       <Transition name="fade">
         <div
@@ -153,39 +140,31 @@ function cancelDelete() {
           class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
           @click.self="cancelDelete"
         >
-          <div data-name="delete-confirm-card" class="bg-primary rounded-lg shadow-xl w-full max-w-sm">
-            <div data-name="delete-confirm-header" class="p-4 border-b border-default">
-              <h3 class="text-lg font-semibold text-primary">Delete Session?</h3>
+          <div data-name="delete-confirm-card" class="bg-surface rounded-xl shadow-xl w-full max-w-sm border border-outline-variant">
+            <div data-name="delete-confirm-header" class="p-4 border-b border-outline-variant">
+              <h3 class="font-headline-sm text-headline-sm text-on-surface">Delete Session?</h3>
             </div>
-
             <div data-name="delete-confirm-body" class="p-4 space-y-2">
-              <p class="text-sm text-secondary">
+              <p class="text-body-sm font-body-sm text-on-surface-variant">
                 Are you sure you want to permanently delete this session?
               </p>
-              <div class="bg-tertiary rounded-lg p-3 text-sm">
-                <p data-name="delete-confirm-project" class="font-medium text-primary">{{ session.project }}</p>
-                <p data-name="delete-confirm-path" class="text-xs text-muted mt-1">{{ session.projectPath }}</p>
+              <div class="bg-surface-container rounded-lg p-3">
+                <p data-name="delete-confirm-project" class="font-body-sm text-body-sm font-semibold text-on-surface">{{ session.project }}</p>
+                <p data-name="delete-confirm-path" class="text-[11px] text-on-surface-variant mt-0.5 truncate">{{ session.projectPath }}</p>
               </div>
-              <p class="text-xs text-error font-medium">
-                This action cannot be undone.
-              </p>
+              <p class="text-[11px] text-error font-semibold">This action cannot be undone.</p>
             </div>
-
-            <div data-name="delete-confirm-actions" class="flex items-center justify-end gap-2 px-4 py-3 border-t border-default">
+            <div data-name="delete-confirm-actions" class="flex items-center justify-end gap-2 px-4 py-3 border-t border-outline-variant">
               <button
                 data-name="delete-confirm-cancel"
                 @click="cancelDelete"
-                class="px-3 py-1.5 text-sm bg-tertiary hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
-              >
-                Cancel
-              </button>
+                class="px-3 py-1.5 text-body-sm bg-surface-container hover:bg-surface-container-high rounded-DEFAULT transition-colors text-on-surface"
+              >Cancel</button>
               <button
                 data-name="delete-confirm-ok"
                 @click="confirmDelete"
-                class="px-3 py-1.5 text-sm bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
-              >
-                Delete
-              </button>
+                class="px-3 py-1.5 text-body-sm bg-error text-on-error rounded-DEFAULT hover:opacity-90 transition-opacity"
+              >Delete</button>
             </div>
           </div>
         </div>

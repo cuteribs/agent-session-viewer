@@ -1,0 +1,211 @@
+<!doctype html>
+<html
+	class="light"
+	lang="en"
+>
+	<head>
+		<meta charset="utf-8" />
+		<meta
+			content="width=device-width, initial-scale=1.0"
+			name="viewport"
+		/>
+		<title>Agent Session Viewer</title>
+		<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+		<link
+			href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+			rel="stylesheet"
+		/>
+		<link
+			href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@400;450&amp;display=swap"
+			rel="stylesheet"
+		/>
+		<link
+			href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+			rel="stylesheet"
+		/>
+		<script id="tailwind-config">
+			tailwind.config = {
+				darkMode: 'class',
+				theme: {
+					extend: {
+						colors: {
+							'on-secondary': '#ffffff',
+							'surface-container-lowest': '#ffffff',
+							'primary-fixed': '#e2dfff',
+							'primary-fixed-dim': '#c3c0ff',
+							'on-tertiary-container': '#d9d8ff',
+							'on-surface-variant': '#464555',
+							'surface-variant': '#e0e3e5',
+							'on-secondary-fixed': '#131b2e',
+							'on-secondary-container': '#5c647a',
+							surface: '#f7f9fb',
+							'on-error-container': '#93000a',
+							error: '#ba1a1a',
+							'secondary-fixed-dim': '#bec6e0',
+							secondary: '#565e74',
+							'on-surface': '#191c1e',
+							'on-primary-container': '#dad7ff',
+							'tertiary-fixed': '#e1e0ff',
+							'tertiary-container': '#4b4dd8',
+							'surface-tint': '#4d44e3',
+							'surface-container': '#eceef0',
+							'on-primary': '#ffffff',
+							'secondary-fixed': '#dae2fd',
+							'on-tertiary-fixed-variant': '#2f2ebe',
+							'on-tertiary': '#ffffff',
+							'surface-container-low': '#f2f4f6',
+							'outline-variant': '#c7c4d8',
+							'surface-container-highest': '#e0e3e5',
+							'on-tertiary-fixed': '#07006c',
+							primary: '#3525cd',
+							'tertiary-fixed-dim': '#c0c1ff',
+							'error-container': '#ffdad6',
+							'surface-bright': '#f7f9fb',
+							'primary-container': '#4f46e5',
+							'on-primary-fixed-variant': '#3323cc',
+							'on-background': '#191c1e',
+							outline: '#777587',
+							tertiary: '#3130c0',
+							'surface-dim': '#d8dadc',
+							'on-primary-fixed': '#0f0069',
+							'inverse-surface': '#2d3133',
+							background: '#f7f9fb',
+							'surface-container-high': '#e6e8ea',
+							'on-secondary-fixed-variant': '#3f465c',
+							'on-error': '#ffffff',
+							'inverse-on-surface': '#eff1f3',
+							'secondary-container': '#dae2fd',
+							'inverse-primary': '#c3c0ff',
+						},
+						borderRadius: {
+							DEFAULT: '0.125rem',
+							lg: '0.25rem',
+							xl: '0.5rem',
+							full: '0.75rem',
+						},
+						spacing: {
+							'stack-sm': '8px',
+							'sidebar-collapsed': '64px',
+							gutter: '16px',
+							base: '4px',
+							'stack-md': '16px',
+							'container-padding': '24px',
+							'sidebar-width': '260px',
+						},
+						fontFamily: {
+							'body-md': ['Inter'],
+							'label-caps': ['Inter'],
+							'code-sm': ['JetBrains Mono'],
+							'headline-sm': ['Inter'],
+							'headline-md': ['Inter'],
+							'body-sm': ['Inter'],
+							'headline-lg': ['Inter'],
+							'code-md': ['JetBrains Mono'],
+						},
+						fontSize: {
+							'body-md': ['14px', { lineHeight: '20px', fontWeight: '400' }],
+							'label-caps': ['11px', { lineHeight: '16px', letterSpacing: '0.05em', fontWeight: '700' }],
+							'code-sm': ['12px', { lineHeight: '18px', fontWeight: '400' }],
+							'headline-sm': ['16px', { lineHeight: '24px', fontWeight: '600' }],
+							'headline-md': ['20px', { lineHeight: '28px', letterSpacing: '-0.01em', fontWeight: '600' }],
+							'body-sm': ['13px', { lineHeight: '18px', fontWeight: '400' }],
+							'headline-lg': ['24px', { lineHeight: '32px', letterSpacing: '-0.02em', fontWeight: '600' }],
+							'code-md': ['13px', { lineHeight: '20px', fontWeight: '450' }],
+						},
+					},
+				},
+			};
+		</script>
+	</head>
+	<body class="bg-background text-on-background font-body-md h-screen flex flex-col overflow-hidden">
+        <div class="flex-1 overflow-y-auto bg-surface-container-low p-container-padding relative z-0">
+          <div class="mx-auto flex flex-col gap-6">
+            <!-- Level 1: System/User Prompt -->
+            <div class="bg-surface border border-outline-variant rounded-xl overflow-hidden shadow-sm">
+              <div class="bg-surface-container-highest px-4 py-2 border-b border-outline-variant flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-on-surface-variant text-[16px]">person</span>
+                  <span class="font-label-caps text-label-caps text-on-surface-variant">USER PROMPT</span>
+                </div>
+                <span class="font-code-sm text-code-sm text-on-surface-variant">14:32:01</span>
+              </div>
+              <div class="p-4 font-body-md text-body-md text-on-surface">
+                Please refactor the Sidebar component to use the new navigation patterns defined in the design system. Ensure it responds correctly on mobile.
+              </div>
+            </div>
+            <!-- Level 2: Assistant Response -->
+            <div class="bg-surface border border-l-4 border-l-primary border-outline-variant rounded-xl overflow-hidden shadow-sm ml-4">
+              <div class="bg-surface-container px-4 py-2 border-b border-outline-variant flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-primary text-[16px]">smart_toy</span>
+                  <span class="font-label-caps text-label-caps text-primary">ASSISTANT</span>
+                </div>
+                <div class="flex gap-3 items-center">
+                  <span class="font-label-caps text-label-caps text-on-surface-variant opacity-60">TOKENS: 450 IN / 120 OUT</span>
+                  <span class="font-code-sm text-code-sm text-on-surface-variant">14:32:04</span>
+                </div>
+              </div>
+              <div class="p-4 font-body-md text-body-md text-on-surface">
+                I'll help refactor the Sidebar component. First, let me check the current implementation and the design system guidelines.
+              </div>
+            </div>
+            <!-- Level 3: Tool Usage (Success) -->
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden shadow-sm ml-8 relative">
+              <div class="bg-surface-container-high px-4 py-2 border-b border-outline-variant flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-on-surface-variant text-[16px]">build</span>
+                  <span class="font-label-caps text-label-caps text-on-surface-variant">TOOL CALLED: READ_FILE</span>
+                  <span class="w-2 h-2 rounded-full bg-emerald-500 ml-2 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
+                </div>
+                <span class="font-code-sm text-code-sm text-on-surface-variant">14:32:05 (1.2s)</span>
+              </div>
+              <div class="p-4">
+                <div class="mb-3">
+                  <span class="font-label-caps text-label-caps text-on-surface-variant block mb-1">INPUT</span>
+                  <pre
+                    class="font-code-sm text-code-sm text-primary bg-surface-container-low p-2 rounded"
+                  ><code>{"path": "src/components/Sidebar.tsx"}</code></pre>
+                </div>
+                <div>
+                  <span class="font-label-caps text-label-caps text-on-surface-variant block mb-1 flex justify-between">
+                    <span class="">RESULT</span>
+                    <span class="text-emerald-500">SUCCESS</span>
+                  </span>
+                  <div class="font-code-sm text-code-sm text-on-surface bg-surface-container-low p-2 rounded max-h-32 overflow-y-auto whitespace-pre-wrap">
+                    import React from 'react'; import { NavLink } from 'react-router-dom'; export const Sidebar = () =&gt; { return ( &lt;div className="w-64
+                    bg-gray-800 text-white h-screen"&gt; {/* Old implementation */} &lt;/div&gt; ); };
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Level 3: Tool Usage (Error) -->
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden shadow-sm ml-8 relative">
+              <div class="bg-surface-container-high px-4 py-2 border-b border-error flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-on-surface-variant text-[16px]">build</span>
+                  <span class="font-label-caps text-label-caps text-on-surface-variant">TOOL CALLED: EXECUTE_COMMAND</span>
+                  <span class="w-2 h-2 rounded-full bg-error ml-2 shadow-[0_0_8px_rgba(186,26,26,0.5)]"></span>
+                </div>
+                <span class="font-code-sm text-code-sm text-on-surface-variant">14:32:10 (0.4s)</span>
+              </div>
+              <div class="p-4">
+                <div class="mb-3">
+                  <span class="font-label-caps text-label-caps text-on-surface-variant block mb-1">INPUT</span>
+                  <pre class="font-code-sm text-code-sm text-primary bg-surface-container-low p-2 rounded"><code>{"command": "npm run test:ui"}</code></pre>
+                </div>
+                <div>
+                  <span class="font-label-caps text-label-caps text-on-surface-variant block mb-1 flex justify-between">
+                    <span class="">RESULT</span>
+                    <span class="text-error">FAILED</span>
+                  </span>
+                  <div class="font-code-sm text-code-sm text-error bg-surface-container-low p-2 rounded max-h-32 overflow-y-auto whitespace-pre-wrap">
+                    ERR! missing script: test:ui npm ERR! A complete log of this run can be found in: npm ERR!
+                    /Users/dev/.npm/_logs/2023-10-24T14_32_10_123Z-debug.log
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+	</body>
+</html>
