@@ -9,11 +9,6 @@ import { exportRouter } from './routes/export.js';
 import { createWatchRouter } from './routes/watch.js';
 import { initFileWatcher } from './services/fileWatcher.js';
 import type { WSMessage } from './types/index.js';
-
-const config = getServerConfig();
-const app = express();
-const server = createServer(app);
-
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
 import { existsSync, readFileSync } from 'fs';
@@ -21,6 +16,35 @@ import { existsSync, readFileSync } from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const packageRoot = resolve(__dirname, '..');
+
+function readPackageInfo(): { name: string; version: string } {
+  const pkgRaw = readFileSync(join(packageRoot, 'package.json'), 'utf-8');
+  const pkg = JSON.parse(pkgRaw) as { name?: string; version?: string };
+  return { name: pkg.name ?? 'agent-session-viewer', version: pkg.version ?? '0.0.0' };
+}
+
+const HELP = `agent-session-viewer
+
+Usage:
+  agent-session-viewer              start the session viewer server
+  agent-session-viewer --help       show this help
+  agent-session-viewer --version    print the installed version
+`;
+
+const [firstArg] = process.argv.slice(2);
+if (firstArg === '--help' || firstArg === '-h') {
+  process.stdout.write(HELP);
+  process.exit(0);
+}
+if (firstArg === '--version' || firstArg === '-V') {
+  const { version } = readPackageInfo();
+  process.stdout.write(`agent-session-viewer ${version}\n`);
+  process.exit(0);
+}
+
+const config = getServerConfig();
+const app = express();
+const server = createServer(app);
 
 // WebSocket server
 const wss = new WebSocketServer({ server, path: '/ws' });
@@ -72,9 +96,7 @@ let cachedVersion: { name: string; version: string } | null = null;
 app.get('/api/version', (_req, res) => {
   try {
     if (!cachedVersion) {
-      const pkgRaw = readFileSync(join(packageRoot, 'package.json'), 'utf-8');
-      const pkg = JSON.parse(pkgRaw) as { name?: string; version?: string };
-      cachedVersion = { name: pkg.name ?? 'agent-session-viewer', version: pkg.version ?? '0.0.0' };
+      cachedVersion = readPackageInfo();
     }
     res.json(cachedVersion);
   } catch (error) {
