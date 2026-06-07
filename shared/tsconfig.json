@@ -11,10 +11,12 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true
   },
   "include": [
-    "types.ts"
+    "types.ts",
+    "pricing.ts"
   ],
   "exclude": [
     "node_modules",

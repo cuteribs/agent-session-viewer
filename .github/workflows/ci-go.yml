@@ -1,0 +1,97 @@
+name: CI — Go Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "server-go/**"
+      - ".github/workflows/ci-go.yml"
+      - ".goreleaser.yaml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "server-go/**"
+      - ".github/workflows/ci-go.yml"
+      - ".goreleaser.yaml"
+
+defaults:
+  run:
+    working-directory: server-go
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Build & vet — fast gate on every push/PR
+  # -------------------------------------------------------------------------
+  build:
+    name: Build & Vet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          # go-version-file: server-go/go.mod
+          # cache-dependency-path: server-go/go.sum
+          go-version-file: server-go/go.mod
+          cache-dependency-path: server-go/go.sum
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Build (all platforms)
+        run: |
+          GOOS=linux   GOARCH=amd64  go build -trimpath ./...
+          GOOS=linux   GOARCH=arm64  go build -trimpath ./...
+          GOOS=darwin  GOARCH=amd64  go build -trimpath ./...
+          GOOS=darwin  GOARCH=arm64  go build -trimpath ./...
+          GOOS=windows GOARCH=amd64  go build -trimpath ./...
+
+      - name: Vet
+        run: go vet ./...
+
+  # -------------------------------------------------------------------------
+  # Lint — golangci-lint with fast linters
+  # -------------------------------------------------------------------------
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          working-directory: server-go
+          args: --fast --timeout=5m
+
+  # -------------------------------------------------------------------------
+  # GoReleaser check — verify the release config is valid
+  # -------------------------------------------------------------------------
+  goreleaser-check:
+    name: GoReleaser Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+
+      - name: Check GoReleaser config
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

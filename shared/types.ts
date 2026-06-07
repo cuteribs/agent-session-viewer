@@ -1,4 +1,10 @@
 // ============================================
+// Shared primitive types
+// ============================================
+
+export type DataSource = 'claude' | 'copilot' | 'codex' | 'opencode' | 'vscode'
+
+// ============================================
 // Raw Data Schemas (from session files)
 // ============================================
 
@@ -347,7 +353,7 @@ export interface SubAgent {
 
 export interface SessionSummary {
   id: string;
-  source: 'claude' | 'copilot' | 'codex' | 'opencode' | 'vscode';
+  source: DataSource;
   project: string;
   projectPath: string;
   startTime: string;

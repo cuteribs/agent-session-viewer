@@ -110,32 +110,32 @@ Copilot 的 Token 数量为**精确值**。已结束的会话以 `session.shutdo
 
 2.  **安装依赖**（各包需单独安装——项目未使用根工作区）：
     ```bash
-    cd packages/shared && npm install
+    cd shared && npm install
     cd ../server && npm install
     cd ../client && npm install
     ```
 
 3.  **构建共享库**（运行服务端或客户端之前必须先执行此步骤）：
     ```bash
-    cd packages/shared && npm run build
+    cd shared && npm run build
     ```
 
 4.  **开发模式运行：**
     ```bash
-    # 服务端（在 packages/server 目录下）
+    # 服务端（在 server/ 目录下）
     npm run dev
 
-    # 客户端（在 packages/client 目录下，另开一个终端）
+    # 客户端（在 client/ 目录下，另开一个终端）
     npm run dev
     ```
 
 5.  **生产环境构建：**
     ```bash
     # 先构建客户端
-    cd packages/client && npm run build
+    cd client && npm run build
 
     # 构建服务端并复制客户端资源
-    cd packages/server && npm run build && npm run build:public
+    cd server && npm run build && npm run build:public
     ```
 
 

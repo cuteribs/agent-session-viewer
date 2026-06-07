@@ -91,6 +91,89 @@ The project path is resolved from the `folder` recorded in the workspace's `work
 
 Exact token counts come from the Copilot Chat **debug logs** at `workspaceStorage/<hash>/GitHub.copilot-chat/debug-logs/<sessionId>/` — `main.jsonl` for the main session and `runSubagent-default-call_<toolCallId>.jsonl` for each subagent. Each tool call's input arguments and result are also recovered from these spans (matched to the session log by tool name), so both are shown in the content preview.
 
+## Go Backend
+
+A Go rewrite of the backend (`server-go/`) is available as a drop-in replacement. It exposes the same HTTP + WebSocket API as the Node.js server, requires no Node.js runtime, and compiles to a single static binary.
+
+### Pre-built binaries
+
+Download the latest release archive for your platform from the [Releases](../../releases) page (look for entries tagged `server-go/vX.Y.Z`), extract it, and run:
+
+```sh
+./agent-session-viewer          # Linux / macOS
+agent-session-viewer.exe        # Windows
+```
+
+The server starts at `http://localhost:3000`. Copy `.env.example` → `.env` to override paths, port, or watch settings.
+
+### Docker
+
+```sh
+docker run -p 3000:3000 \
+  -v ~/.claude:/root/.claude:ro \
+  -v ~/.copilot:/root/.copilot:ro \
+  -v ~/.codex:/root/.codex:ro \
+  -v ~/.local/share/opencode:/root/.local/share/opencode:ro \
+  ghcr.io/OWNER/agent-session-viewer:latest
+```
+
+Replace `OWNER` with the GitHub username/org that owns this repository.
+
+To pass custom environment variables, use `--env-file`:
+
+```sh
+docker run -p 3000:3000 --env-file .env \
+  -v ~/.claude:/root/.claude:ro \
+  ghcr.io/OWNER/agent-session-viewer:latest
+```
+
+### Build from source
+
+Requires Go 1.23 or later.
+
+```sh
+cd server-go
+go build -o agent-session-viewer .
+./agent-session-viewer
+```
+
+For a release-optimised binary with version stamping:
+
+```sh
+VERSION=$(git describe --tags --match 'server-go/v*' | sed 's|server-go/||')
+go build -trimpath \
+  -ldflags="-s -w -X main.version=${VERSION} -X main.commit=$(git rev-parse --short HEAD) -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  -o agent-session-viewer .
+```
+
+### Releasing a new Go version
+
+Releases are automated via [GoReleaser](https://goreleaser.com) and triggered by pushing a `server-go/vMAJOR.MINOR.PATCH` tag:
+
+```sh
+git tag server-go/v1.0.0
+git push origin server-go/v1.0.0
+```
+
+This triggers the [Release — Go Backend](.github/workflows/release-go.yml) workflow which:
+
+1. Cross-compiles binaries for `linux/amd64`, `linux/arm64`, `darwin/amd64`, `darwin/arm64`, `windows/amd64`
+2. Packages each as a `.tar.gz` (or `.zip` on Windows) with `README.md` and `.env.example`
+3. Generates `checksums.txt` (SHA-256)
+4. Creates a GitHub Release with all assets and an auto-generated changelog
+5. Builds a multi-arch Docker image (`linux/amd64`, `linux/arm64`) and pushes it to GHCR
+
+You can also trigger the release manually from the **Actions** tab → **Release — Go Backend** → **Run workflow**.
+
+### CI
+
+The [CI — Go Backend](.github/workflows/ci-go.yml) workflow runs on every push and pull request that touches `server-go/`. It:
+
+- Builds for all five target platforms
+- Runs `go vet`
+- Runs `golangci-lint` (fast linters)
+- Validates the GoReleaser config (`goreleaser check`)
+
 ## Development
 
 If you want to contribute or run the project from source:
@@ -110,32 +193,32 @@ If you want to contribute or run the project from source:
 
 2.  **Install dependencies** (install each package separately — there is no root workspace):
     ```bash
-    cd packages/shared && npm install
+    cd shared && npm install
     cd ../server && npm install
     cd ../client && npm install
     ```
 
 3.  **Build the shared library** (required before running server or client):
     ```bash
-    cd packages/shared && npm run build
+    cd shared && npm run build
     ```
 
 4.  **Run in development mode:**
     ```bash
-    # Server (from packages/server)
+    # Server (from server/)
     npm run dev
 
-    # Client (from packages/client, in a separate terminal)
+    # Client (from client/, in a separate terminal)
     npm run dev
     ```
 
 5.  **Build for production:**
     ```bash
     # Build client first
-    cd packages/client && npm run build
+    cd client && npm run build
 
     # Build server and copy client assets
-    cd packages/server && npm run build && npm run build:public
+    cd server && npm run build && npm run build:public
     ```
 
 ## Token Pricing Reference

@@ -1,0 +1,134 @@
+name: Release — Go Backend
+
+# Trigger on tag push: server-go/vMAJOR.MINOR.PATCH
+# To create a release:
+#   git tag server-go/v1.0.0 && git push origin server-go/v1.0.0
+#
+# Or dispatch manually from the Actions tab (provide the full tag name).
+
+on:
+  push:
+    tags:
+      - "server-go/v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. server-go/v1.0.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write   # create GitHub Release + upload assets
+  packages: write   # push Docker image to GHCR
+  id-token: write   # OIDC token (future: Sigstore / cosign)
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Build cross-platform binaries, create GitHub Release, upload archives
+  # -------------------------------------------------------------------------
+  goreleaser:
+    name: GoReleaser
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      # Ensure the tag exists locally when triggered via workflow_dispatch
+      - name: Fetch tag (dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        run: git fetch --tags origin
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: server-go/go.mod
+          cache-dependency-path: server-go/go.sum
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ steps.tag.outputs.tag }}
+
+  # -------------------------------------------------------------------------
+  # Build and push multi-arch Docker image to GHCR
+  # -------------------------------------------------------------------------
+  docker:
+    name: Docker (multi-arch)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            RAW="${{ inputs.tag }}"
+          else
+            RAW="${{ github.ref_name }}"
+          fi
+          # Strip "server-go/" prefix → semantic version (e.g. v1.0.0)
+          VERSION="${RAW#server-go/}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${{ github.repository_owner }}/agent-session-viewer" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.tag.outputs.image }}
+          tags: |
+            type=raw,value=${{ steps.tag.outputs.version }}
+            type=raw,value=latest
+          labels: |
+            org.opencontainers.image.title=agent-session-viewer
+            org.opencontainers.image.description=Analyze and visualize AI agent sessions
+            org.opencontainers.image.url=https://github.com/${{ github.repository }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.tag.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: server-go
+          file: server-go/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.tag.outputs.version }}
+            COMMIT=${{ github.sha }}
+            DATE=${{ github.event.repository.updated_at }}
+          # GitHub Actions cache for faster rebuilds
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

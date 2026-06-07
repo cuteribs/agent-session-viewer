@@ -23,13 +23,13 @@ jobs:
 
       - name: Build & Pack
         run: |
-          pushd packages/client
+          pushd client
           npm install
           popd
 
-          pushd packages/server
+          pushd server
           npm install && npm run build
-          cp ../../README.md ./
+          cp ../README.md ./
           npm pack
           mkdir tar
           cp ./cuteribs-agent-session-viewer-* tar/
@@ -39,9 +39,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cuteribs-agent-session-viewer
-          path: packages/server/tar/
+          path: server/tar/
 
       - name: Publish
         run: |
-          cd packages/server/tar
+          cd server/tar
           npm publish *.tgz
