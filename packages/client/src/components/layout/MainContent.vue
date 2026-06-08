@@ -87,7 +87,7 @@ function handleExport(format: 'csv' | 'json') {
             <div class="flex flex-wrap gap-x-6 gap-y-2 lg:justify-end items-end">
               <div class="flex flex-col">
                 <span class="font-label-caps text-label-caps text-on-surface-variant">SESSION ID</span>
-                <span data-name="session-id" class="font-code-sm text-code-sm text-on-surface">{{ session.id.substring(0, 20) }}…</span>
+                <span data-name="session-id" class="font-code-sm text-code-sm text-on-surface">{{ session.id.substring(0, 36) }}</span>
               </div>
 
               <!-- Model display -->

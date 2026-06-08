@@ -499,15 +499,23 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
     for (const agent of subAgentMap.values()) {
       if (!agent.messages) agent.messages = [];
 
-      // Prepend the task prompt as a synthetic user message
+      // Prepend the task prompt as a synthetic system message
       if (agent.prompt) {
+        const promptId = `${agent.id}-prompt`;
         agent.messages.unshift({
-          id: `${agent.id}-prompt`,
+          id: promptId,
           parentId: null,
-          role: 'user',
+          role: 'system',
           content: agent.prompt,
           timestamp: agent.startTime,
         });
+        // Re-parent all assistant messages to the prompt (level 1→2).
+        // Tool messages already point to their assistant (level 2→3) — leave unchanged.
+        for (const msg of agent.messages) {
+          if (msg.role === 'assistant') {
+            msg.parentId = promptId;
+          }
+        }
       }
 
       // Append the final result as a synthetic system message

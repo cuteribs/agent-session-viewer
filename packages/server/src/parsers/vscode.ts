@@ -787,6 +787,7 @@ function buildSession(
     }
 
     const finalContent = content.trim();
+    const assistantId = req.requestId ? `asst-${req.requestId}` : `asst-${Date.now()}-${Math.random()}`;
     if (finalContent || toolCalls.length > 0) {
       const ts = new Date(req.timestamp + 100).toISOString();
       // Find first subagent toolCallId in this request (for subAgentRef)
@@ -795,13 +796,12 @@ function buildSession(
         ?.toolCallId;
 
       const msg: Message = {
-        id: req.requestId ? `asst-${req.requestId}` : `asst-${Date.now()}-${Math.random()}`,
+        id: assistantId,
         parentId: req.requestId ? `user-${req.requestId}` : null,
         role: 'assistant',
         content: finalContent,
         timestamp: ts,
         model: reqModel,
-        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
         subAgentRef: firstSubagentCallId,
       };
 
@@ -815,6 +815,24 @@ function buildSession(
       }
 
       messages.push(msg);
+
+      // Emit a separate role:'tool' child message for each tool call
+      for (let i = 0; i < toolCalls.length; i++) {
+        const tc = toolCalls[i];
+        messages.push({
+          id: `${assistantId}::tool::${tc.id}`,
+          parentId: assistantId,
+          role: 'tool',
+          content: '',
+          timestamp: new Date(req.timestamp + 100 + i + 1).toISOString(),
+          toolCalls: [tc],
+          toolResult: tc.result !== undefined ? {
+            toolCallId: tc.id,
+            success: true,
+            content: tc.result,
+          } : undefined,
+        });
+      }
     }
   }
 
@@ -878,7 +896,7 @@ function buildSession(
       });
     }
 
-    // Tool calls made by the subagent → one assistant message per group
+    // Tool calls made by the subagent → one assistant message + separate role:'tool' children
     if (parts && parts.length > 0) {
       const dedupedSaParts = deduplicateResponseParts(parts);
       const saToolCalls: ToolCall[] = [];
@@ -918,16 +936,34 @@ function buildSession(
         }
       }
 
+      const saAsstId = `${toolCallId}-tools`;
       if (saToolCalls.length > 0 || saTextParts.trim()) {
         saMessages.push({
-          id: `${toolCallId}-tools`,
+          id: saAsstId,
           parentId: `${toolCallId}-user`,
           role: 'assistant',
           content: saTextParts.trim(),
           timestamp: sa.endTime || sa.startTime,
           model: sa.model,
-          toolCalls: saToolCalls.length > 0 ? saToolCalls : undefined,
         });
+
+        // Emit a separate role:'tool' child message for each subagent tool call
+        for (let i = 0; i < saToolCalls.length; i++) {
+          const tc = saToolCalls[i];
+          saMessages.push({
+            id: `${saAsstId}::tool::${tc.id}`,
+            parentId: saAsstId,
+            role: 'tool',
+            content: '',
+            timestamp: sa.endTime || sa.startTime,
+            toolCalls: [tc],
+            toolResult: tc.result !== undefined ? {
+              toolCallId: tc.id,
+              success: true,
+              content: tc.result,
+            } : undefined,
+          });
+        }
       }
     }
 

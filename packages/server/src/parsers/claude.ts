@@ -37,6 +37,12 @@ interface ClaudeRawEntry {
     content?: unknown;
     itemCount?: number;
   };
+  toolUseResult?: {
+    agentType?: string;
+    agentId?: string;
+    status?: string;
+    content?: Array<{ type: string; text?: string }>;
+  };
 }
 
 interface OrderedMessage extends Message {
@@ -53,6 +59,7 @@ interface OrderedToolResult {
   result: ToolResult;
   order: number;
   timestamp: string;
+  agentType?: string;
 }
 
 interface CommandInfo {
@@ -373,6 +380,10 @@ function buildToolMessages(
       toolCalls: [
         {
           ...occurrence.call,
+          // Inject agentType into arguments for Agent tool calls
+          arguments: (occurrence.call.name === 'Agent' && result?.agentType)
+            ? { ...occurrence.call.arguments, agentType: result.agentType }
+            : occurrence.call.arguments,
           result: result?.result.content,
         },
       ],
@@ -413,10 +424,20 @@ function collectOrderedToolResults(
     const entryOrder = (rawOrder.get(entry.uuid) ?? 0) * 100;
     extractToolResults(normalizeContent(entry.message.content)).forEach((result, index) => {
       if (!resultMap.has(result.toolCallId)) {
+        // If toolUseResult.content exists and has text, prefer it over message.content
+        const toolUseResult = (entry as ClaudeRawEntry).toolUseResult;
+        if (toolUseResult?.content && Array.isArray(toolUseResult.content)) {
+          const text = toolUseResult.content
+            .filter(b => b.type === 'text' && b.text)
+            .map(b => b.text!)
+            .join('\n');
+          if (text) result.content = text;
+        }
         resultMap.set(result.toolCallId, {
           result,
           order: entryOrder + index + 1,
           timestamp: entry.timestamp,
+          agentType: toolUseResult?.agentType,
         });
       }
     });
@@ -769,11 +790,22 @@ function extractThinkingText(blocks: ContentBlock[]): string {
 function extractToolResults(blocks: ContentBlock[]): ToolResult[] {
   return blocks
     .filter(block => block.type === 'tool_result' && block.tool_use_id)
-    .map(block => ({
-      toolCallId: block.tool_use_id!,
-      success: !block.is_error,
-      content: typeof block.content === 'string' ? block.content : '',
-    }));
+    .map(block => {
+      let content = '';
+      if (typeof block.content === 'string') {
+        content = block.content;
+      } else if (Array.isArray(block.content)) {
+        content = (block.content as ContentBlock[])
+          .filter(b => b.type === 'text' && b.text)
+          .map(b => b.text!)
+          .join('\n');
+      }
+      return {
+        toolCallId: block.tool_use_id!,
+        success: !block.is_error,
+        content,
+      };
+    });
 }
 
 function extractToolCalls(blocks: ContentBlock[]): ToolCall[] {

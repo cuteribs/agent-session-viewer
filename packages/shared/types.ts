@@ -221,7 +221,7 @@ export interface ContentBlock {
   id?: string;
   name?: string;
   input?: Record<string, unknown>;
-  content?: string;
+  content?: string | ContentBlock[];
   tool_use_id?: string;
   is_error?: boolean;
 }

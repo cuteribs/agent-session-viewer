@@ -26,10 +26,7 @@ const activeTab = ref<TabId>('timeline')
 
 // Normalize the subagent into a viewmodel: input prompt, result, entries, and a
 // SessionDetail-shaped object for the Charts view.
-const { inputPrompt, result, session: subAgentSession } = useSubAgentViewModel(toRef(props, 'agent'))
-
-const showInput = ref(true)
-const showResult = ref(true)
+const { session: subAgentSession } = useSubAgentViewModel(toRef(props, 'agent'))
 
 function durationFormatted(ms?: number) {
   if (!ms) return ''
@@ -95,47 +92,6 @@ function durationFormatted(ms?: number) {
           <span class="text-on-surface-variant">Messages:</span>
           <span class="font-medium">{{ agent.messages.length }}</span>
         </div>
-      </div>
-    </div>
-
-    <!-- Input / Result panels -->
-    <div data-name="subagent-io" class="bg-surface border-b border-outline-variant px-4 py-3 space-y-3">
-      <!-- Input (prompt) -->
-      <div v-if="inputPrompt" data-name="subagent-input">
-        <button
-          data-name="subagent-input-toggle"
-          @click="showInput = !showInput"
-          class="flex items-center gap-1.5 text-xs font-semibold text-on-surface-variant uppercase tracking-wide hover:text-on-surface transition-colors"
-        >
-          <svg :class="['w-3 h-3 transition-transform', showInput ? 'rotate-90' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-          </svg>
-          Input
-        </button>
-        <pre
-          v-if="showInput"
-          data-name="subagent-input-text"
-          class="mt-1.5 p-3 bg-surface-container-high rounded text-sm text-on-surface whitespace-pre-wrap break-words max-h-60 overflow-y-auto font-mono"
-        >{{ inputPrompt }}</pre>
-      </div>
-
-      <!-- Result -->
-      <div v-if="result" data-name="subagent-result">
-        <button
-          data-name="subagent-result-toggle"
-          @click="showResult = !showResult"
-          class="flex items-center gap-1.5 text-xs font-semibold text-on-surface-variant uppercase tracking-wide hover:text-on-surface transition-colors"
-        >
-          <svg :class="['w-3 h-3 transition-transform', showResult ? 'rotate-90' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-          </svg>
-          Result
-        </button>
-        <pre
-          v-if="showResult"
-          data-name="subagent-result-text"
-          class="mt-1.5 p-3 bg-green-50 dark:bg-green-900/15 border border-green-200 dark:border-green-800 rounded text-sm text-on-surface whitespace-pre-wrap break-words max-h-60 overflow-y-auto font-mono"
-        >{{ result }}</pre>
       </div>
     </div>
 

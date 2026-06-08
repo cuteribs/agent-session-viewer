@@ -194,7 +194,9 @@ onUnmounted(() => {
                 {{ message?.role }}
               </span>
               <span v-if="message?.role === 'tool' && message.toolCalls?.[0]?.name" class="text-sm font-semibold text-on-surface">
-                {{ message.toolCalls[0].name }}<template v-if="message.toolCalls[0].name === 'task' && message.toolCalls[0].arguments?.agent_type"> <span class="font-normal text-on-surface-variant">({{ message.toolCalls[0].arguments.agent_type }})</span></template>
+                {{ message.toolCalls[0].name }}
+                <template v-if="message.toolCalls[0].name === 'task' && message.toolCalls[0].arguments?.agent_type"><span class="font-normal text-on-surface-variant">({{ message.toolCalls[0].arguments.agent_type }})</span></template>
+                <template v-else-if="message.toolCalls[0].name === 'Agent' && message.toolCalls[0].arguments?.agentType"><span class="font-normal text-on-surface-variant">({{ message.toolCalls[0].arguments.agentType }})</span></template>
               </span>
               <span v-else-if="message?.model" class="text-on-surface-variant">{{ message.model }}</span>
             </div>
@@ -207,7 +209,7 @@ onUnmounted(() => {
             <div v-if="message?.role === 'tool' && message.toolCalls && message.toolCalls.length > 0" class="mb-4">
               <h4 class="text-sm font-semibold text-on-surface mb-2">Tool Input</h4>
               <div v-for="call in message.toolCalls" :key="call.id" class="rounded-lg overflow-hidden border border-yellow-200 dark:border-yellow-800">
-                <template v-if="call.name === 'task'">
+                <template v-if="call.name === 'task' || call.name === 'Agent'">
                   <div v-if="call.arguments.agent_type" class="px-3 py-2 text-xs border-b border-yellow-100 dark:border-yellow-900/40">
                     <span class="text-on-surface-variant font-medium">agent_type: </span>
                     <span class="font-mono">{{ call.arguments.agent_type }}</span>
