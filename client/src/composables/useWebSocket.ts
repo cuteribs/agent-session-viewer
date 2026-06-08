@@ -1,9 +1,14 @@
 import { ref, onUnmounted } from 'vue'
 import type { WSMessage } from '../types'
+import { serverUrl } from '@/utils/serverConfig'
 
-// Use the same host/port as the current page, with ws/wss based on http/https
-const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-const WS_URL = `${protocol}//${window.location.host}/ws`
+function getWsUrl() {
+  if (serverUrl.value) {
+    return serverUrl.value.replace(/^https/, 'wss').replace(/^http/, 'ws') + '/ws'
+  }
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${window.location.host}/ws`
+}
 
 const socket = ref<WebSocket | null>(null)
 const connected = ref(false)
@@ -23,7 +28,7 @@ export function useWebSocket() {
     }
 
     try {
-      socket.value = new WebSocket(WS_URL)
+      socket.value = new WebSocket(getWsUrl())
 
       socket.value.onopen = () => {
         console.log('WebSocket connected')

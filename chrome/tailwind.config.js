@@ -1,19 +1,11 @@
 /** @type {import('tailwindcss').Config} */
+import clientConfig from '../client/tailwind.config.js'
+
 export default {
+  ...clientConfig,
   content: [
     './index.html',
     './src/**/*.{vue,ts,js}',
+    '../client/src/**/*.{vue,ts,js}',
   ],
-  darkMode: 'class',
-  theme: {
-    extend: {
-      // Accent colour as a proper Tailwind token so focus rings / opacity
-      // modifiers (ring-accent/30, bg-accent/5) work.
-      colors: {
-        accent: 'var(--accent-color)',
-        error:  'var(--error-color)',
-      },
-    },
-  },
-  plugins: [],
 }

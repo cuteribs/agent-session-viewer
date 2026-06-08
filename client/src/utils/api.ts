@@ -1,7 +1,11 @@
-const API_BASE = '/api';
+import { serverUrl } from '@/utils/serverConfig'
+
+function getApiBase() {
+  return serverUrl.value ? `${serverUrl.value}/api` : '/api'
+}
 
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${url}`, {
+  const response = await fetch(`${getApiBase()}${url}`, {
     headers: {
       'Content-Type': 'application/json',
       ...options?.headers,
@@ -70,7 +74,7 @@ export function getExportURL(
   sessionId: string,
   format: 'csv' | 'json' | 'summary'
 ) {
-  return `${API_BASE}/export/${source}/${sessionId}?format=${format}`;
+  return `${getApiBase()}/export/${source}/${sessionId}?format=${format}`;
 }
 
 // Raw log file download URL
@@ -78,7 +82,7 @@ export function getLogFileURL(
   source: 'claude' | 'copilot' | 'codex' | 'opencode' | 'vscode',
   sessionId: string
 ) {
-  return `${API_BASE}/sessions/${source}/${sessionId}/logfile`;
+  return `${getApiBase()}/sessions/${source}/${sessionId}/logfile`;
 }
 
 // App version

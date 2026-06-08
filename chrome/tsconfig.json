@@ -1,18 +1,18 @@
 {
+  "extends": "../client/tsconfig.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "strict": true,
-    "jsx": "preserve",
-    "jsxImportSource": "vue",
-    "noEmit": true,
+    "types": ["chrome"],
     "paths": {
-      "@/*": ["./src/*"],
-      "@shared": ["../shared/types.ts"],
-      "@shared-pricing": ["../shared/pricing.ts"]
+      "@/*": ["./src/*", "../client/src/*"],
+      "shared/*": ["../shared/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.vue", "vite.config.ts", "../shared/types.ts"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.vue",
+    "../client/src/**/*.ts",
+    "../client/src/**/*.tsx",
+    "../client/src/**/*.vue"
+  ]
 }

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useSessionsStore } from '@/stores/sessions'
 import { useConfigStore } from '@/stores/config'
 import { useTheme } from '@/composables/useTheme'
 import { fetchVersion } from '@/utils/api'
+import { serverUrl, saveServerUrl } from '@/utils/serverConfig'
 
 const sessionsStore = useSessionsStore()
 const configStore = useConfigStore()
@@ -12,6 +13,13 @@ const { theme, setTheme } = useTheme()
 const isOpen = computed(() => sessionsStore.showSettings)
 
 const appVersion = ref<string | null>(null)
+const localServerUrl = ref(serverUrl.value)
+
+watch(serverUrl, (v) => { localServerUrl.value = v })
+
+function applyServerUrl() {
+  saveServerUrl(localServerUrl.value)
+}
 
 function close() {
   sessionsStore.closeSettings()
@@ -61,6 +69,25 @@ onUnmounted(() => {
 
           <!-- Content -->
           <div class="p-4 space-y-6">
+            <!-- Server Connection -->
+            <div>
+              <h3 class="text-sm font-medium text-on-surface mb-3">Server Connection</h3>
+              <div>
+                <label class="block text-xs text-on-surface-variant mb-1">Server URL</label>
+                <input
+                  v-model="localServerUrl"
+                  type="url"
+                  placeholder="http://localhost:3000"
+                  class="w-full px-3 py-2 rounded border border-outline-variant bg-surface-container-high text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-primary"
+                  @blur="applyServerUrl"
+                  @keydown.enter.prevent="applyServerUrl"
+                />
+                <p class="mt-1 text-xs text-on-surface-variant">
+                  Leave empty to use the same origin (web app default).
+                </p>
+              </div>
+            </div>
+
             <!-- Theme -->
             <div>
               <h3 class="text-sm font-medium text-on-surface mb-3">Appearance</h3>
