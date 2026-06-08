@@ -181,55 +181,54 @@ onUnmounted(() => {
           <div class="flex items-center justify-between px-4 py-2 border-b border-outline-variant text-sm">
             <div class="flex items-center gap-4">
               <span
-                :class="[
-                  'px-2 py-0.5 text-xs font-medium rounded text-white capitalize',
-                  message?.role === 'user' ? 'bg-blue-500' :
-                  message?.role === 'assistant' ? 'bg-green-500' :
-                  message?.role === 'tool' ? 'bg-yellow-500' : 'bg-gray-500'
-                ]"
+                class="px-2 py-0.5 text-xs font-medium rounded text-white capitalize"
+                :style="{
+                  backgroundColor:
+                    message?.role === 'user' ? '#6b7280' :
+                    message?.role === 'assistant' ? '#d670d6' :
+                    message?.role === 'tool'
+                      ? (message.toolResult?.success === false ? '#ed7580' : '#6bb867')
+                      : '#3b8eea'
+                }"
               >
                 {{ message?.role }}
               </span>
-              <span v-if="message?.model" class="text-on-surface-variant">{{ message.model }}</span>
+              <span v-if="message?.role === 'tool' && message.toolCalls?.[0]?.name" class="text-sm font-semibold text-on-surface">
+                {{ message.toolCalls[0].name }}<template v-if="message.toolCalls[0].name === 'task' && message.toolCalls[0].arguments?.agent_type"> <span class="font-normal text-on-surface-variant">({{ message.toolCalls[0].arguments.agent_type }})</span></template>
+              </span>
+              <span v-else-if="message?.model" class="text-on-surface-variant">{{ message.model }}</span>
             </div>
             <span class="text-on-surface-variant">{{ message ? formatDateTime(message.timestamp) : '' }}</span>
           </div>
 
           <!-- Content -->
           <div class="flex-1 overflow-y-auto p-4">
-            <div v-if="message?.content" data-name="message-content" class="message-content whitespace-pre-wrap break-words text-on-surface font-mono">
-              {{ message.content }}
-            </div>
-            <div v-else-if="!message?.toolCalls?.length && !message?.toolResult" class="text-on-surface-variant text-sm italic">
-              (no content)
+          <!-- Tool invocation -->
+            <div v-if="message?.role === 'tool' && message.toolCalls && message.toolCalls.length > 0" class="mb-4">
+              <h4 class="text-sm font-semibold text-on-surface mb-2">Tool Input</h4>
+              <div v-for="call in message.toolCalls" :key="call.id" class="rounded-lg overflow-hidden border border-yellow-200 dark:border-yellow-800">
+                <template v-if="call.name === 'task'">
+                  <div v-if="call.arguments.agent_type" class="px-3 py-2 text-xs border-b border-yellow-100 dark:border-yellow-900/40">
+                    <span class="text-on-surface-variant font-medium">agent_type: </span>
+                    <span class="font-mono">{{ call.arguments.agent_type }}</span>
+                  </div>
+                  <div v-if="call.arguments.description" class="px-3 py-2 text-xs border-b border-yellow-100 dark:border-yellow-900/40">
+                    <span class="text-on-surface-variant font-medium">description: </span>
+                    <span class="font-mono">{{ call.arguments.description }}</span>
+                  </div>
+                  <pre v-if="call.arguments.prompt" class="px-3 py-2 text-xs overflow-x-auto whitespace-pre-wrap"><code>{{ call.arguments.prompt }}</code></pre>
+                </template>
+                <template v-else>
+                  <pre class="px-3 py-2 text-xs overflow-x-auto"><code>{{ formatToolArgs(call.arguments) }}</code></pre>
+                </template>
+              </div>
             </div>
 
-            <!-- Tool calls -->
-            <div v-if="message?.toolCalls && message.toolCalls.length > 0" class="mt-6">
-              <h4 class="text-sm font-semibold text-on-surface mb-3">Tool Calls</h4>
-              <div class="space-y-3">
-                <div
-                  v-for="tool in message.toolCalls"
-                  :key="tool.id"
-                  class="bg-surface-container-high rounded-lg overflow-hidden"
-                >
-                  <div class="flex items-center gap-2 px-3 py-2 bg-yellow-100 dark:bg-yellow-900/30">
-                    <svg class="w-4 h-4 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <span class="font-medium text-yellow-800 dark:text-yellow-200">{{ tool.name }}</span>
-                  </div>
-                  <!-- Input -->
-                  <div class="px-3 pt-2 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Input</div>
-                  <pre class="px-3 pb-2 text-xs overflow-x-auto"><code>{{ formatToolArgs(tool.arguments) }}</code></pre>
-                  <!-- Result -->
-                  <template v-if="tool.result">
-                    <div class="px-3 pt-1 text-xs font-semibold text-on-surface-variant uppercase tracking-wider border-t border-outline-variant/50">Result</div>
-                    <pre class="px-3 pb-2 pt-2 text-xs overflow-x-auto max-h-64"><code>{{ formatToolResult(tool.result) }}</code></pre>
-                  </template>
-                </div>
-              </div>
+            <div v-if="message?.content && message?.role !== 'tool'" data-name="message-content" class="message-content whitespace-pre-wrap break-words text-on-surface font-mono">
+              {{ message.content }}
+            </div>
+            <div v-else-if="!message?.toolResult && message?.role !== 'tool'" class="text-on-surface-variant text-sm italic">
+              (no content)
             </div>
 
             <!-- Tool result -->

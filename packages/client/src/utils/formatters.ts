@@ -114,17 +114,12 @@ export function getSourceBgColor(source: 'claude' | 'copilot' | 'codex' | 'openc
   return 'bg-purple-500';
 }
 
-export function getRoleColor(role: string): string {
+export function getRoleColor(role: string, toolSuccess?: boolean): string {
   switch (role) {
-    case 'user':
-      return 'bg-blue-500';
-    case 'assistant':
-      return 'bg-green-500';
-    case 'system':
-      return 'bg-gray-500';
-    case 'tool':
-      return 'bg-yellow-500';
-    default:
-      return 'bg-gray-400';
+    case 'user':      return '#6b7280';
+    case 'assistant': return '#d670d6';
+    case 'system':    return '#3b8eea';
+    case 'tool':      return toolSuccess === false ? '#ed7580' : '#6bb867';
+    default:          return '#6b7280';
   }
 }

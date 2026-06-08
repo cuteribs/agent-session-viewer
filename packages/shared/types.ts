@@ -288,6 +288,10 @@ export interface CopilotEvent {
       content: string;
       detailedContent?: string;
     };
+    error?: {
+      message?: string;
+      code?: string;
+    };
 
     // subagent.* events
     agentName?: string;

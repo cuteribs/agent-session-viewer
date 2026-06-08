@@ -1,4 +1,1 @@
-cd packages\server
-npm install && npm run build
-
-node dist\index.js
+npm install --prefix packages/server && npm run build --prefix packages/server && npm run start --prefix packages/server

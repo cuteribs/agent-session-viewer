@@ -245,23 +245,25 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
     // Accumulate exact output tokens from subagent assistant.message events
     const subAgentOutputMap = new Map<string, number>(); // agentId → summed outputTokens
 
+    // Track last message IDs for parentId chaining (level hierarchy)
+    let lastUserMessageId: string | null = null;
+    let lastAssistantMessageId: string | null = null;
+    const lastAssistantByAgent = new Map<string, string>(); // agentId → last assistant message id
+    const toolMessagesById = new Map<string, Message>(); // toolCallId → Message ref for patching
+
     for (const event of events) {
       if (event.type === 'user.message') {
         const userContent = event.data.content || event.data.transformedContent || '';
         messages.push({
           id: event.id,
-          parentId: event.parentId,
+          parentId: null,
           role: 'user',
           content: userContent,
           timestamp: event.timestamp,
         });
+        lastUserMessageId = event.id;
 
       } else if (event.type === 'assistant.message') {
-        const toolCalls: ToolCall[] = (event.data.toolRequests || []).map(tr => ({
-          id: tr.toolCallId,
-          name: tr.name,
-          arguments: tr.arguments,
-        }));
         const msgContent = event.data.content || event.data.reasoningText || '';
 
         // ── Route subagent-owned messages to that agent's message log ──
@@ -277,12 +279,11 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
 
           agent.messages.push({
             id: event.id,
-            parentId: event.parentId,
+            parentId: lastAssistantByAgent.get(event.agentId) ?? null,
             role: 'assistant',
             content: msgContent,
             timestamp: event.timestamp,
             model: subMsgModel,
-            toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
             // Per-message output only (exact); cost can be derived by SubAgentView
             tokens: subOutputTok > 0 ? {
               input: 0,
@@ -294,6 +295,7 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
           if (subOutputTok > 0) {
             subAgentOutputMap.set(event.agentId, (subAgentOutputMap.get(event.agentId) ?? 0) + subOutputTok);
           }
+          lastAssistantByAgent.set(event.agentId, event.id);
 
         } else if (hasPatchedTokens) {
           // ── Main agent — Patched mode ─────────────────────────────────
@@ -317,14 +319,14 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
 
           messages.push({
             id: event.id,
-            parentId: event.parentId,
+            parentId: lastUserMessageId,
             role: 'assistant',
             content: msgContent,
             timestamp: event.timestamp,
             model,
-            toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
             tokens: msgTokens,
           });
+          lastAssistantMessageId = event.id;
 
         } else {
           // ── Main agent — No estimation, only output ──────────────────
@@ -332,46 +334,63 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
 
           messages.push({
             id: event.id,
-            parentId: event.parentId,
+            parentId: lastUserMessageId,
             role: 'assistant',
             content: msgContent,
             timestamp: event.timestamp,
             model,
-            toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
             tokens: exactOutputTokens > 0 ? {
               input: 0,
               output: exactOutputTokens,
               estimated: false,
             } : undefined,
           });
+          lastAssistantMessageId = event.id;
+        }
+
+      } else if (event.type === 'tool.execution_start') {
+        // ── Create a tool message now; content patched by execution_complete ──
+        const toolMsg: Message = {
+          id: event.id,
+          parentId: event.agentId
+            ? (lastAssistantByAgent.get(event.agentId) ?? null)
+            : lastAssistantMessageId,
+          role: 'tool',
+          content: '',
+          timestamp: event.timestamp,
+          toolCalls: event.data.toolName ? [{
+            id: event.data.toolCallId || event.id,
+            name: event.data.toolName,
+            arguments: event.data.arguments || {},
+          }] : undefined,
+          // toolResult is intentionally absent here; set by tool.execution_complete
+        };
+        if (event.data.toolCallId) {
+          toolMessagesById.set(event.data.toolCallId, toolMsg);
+        }
+        if (event.agentId && subAgentMap.has(event.agentId)) {
+          const agent = subAgentMap.get(event.agentId)!;
+          if (!agent.messages) agent.messages = [];
+          agent.messages.push(toolMsg);
+        } else {
+          messages.push(toolMsg);
         }
 
       } else if (event.type === 'tool.execution_complete') {
-        const result = toolResultsById.get(event.data.toolCallId || '');
-        if (result) {
-          if (event.agentId && subAgentMap.has(event.agentId)) {
-            // ── Route tool result to subagent's message log ────────────
-            const agent = subAgentMap.get(event.agentId)!;
-            if (!agent.messages) agent.messages = [];
-            agent.messages.push({
-              id: event.id,
-              parentId: event.parentId,
-              role: 'tool',
-              content: result.content,
-              timestamp: event.timestamp,
-              toolResult: result,
-            });
-          } else {
-            // ── Main agent tool result ─────────────────────────────────
-            messages.push({
-              id: event.id,
-              parentId: event.parentId,
-              role: 'tool',
-              content: result.content,
-              timestamp: event.timestamp,
-              toolResult: result,
-            });
-          }
+        // Only patch the existing tool message — never create a new message item
+        const toolCallId = event.data.toolCallId || '';
+        const existingToolMsg = toolMessagesById.get(toolCallId);
+        if (existingToolMsg) {
+          const resultContent = event.data.result?.detailedContent
+            || event.data.result?.content
+            || event.data.error?.message
+            || '';
+          existingToolMsg.content = resultContent;
+          existingToolMsg.toolResult = {
+            toolCallId,
+            success: event.data.success ?? true,
+            content: resultContent,
+          };
         }
 
       } else if (event.type === 'subagent.completed') {
@@ -433,11 +452,43 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
       } else if (event.type === 'session.error') {
         messages.push({
           id: event.id,
-          parentId: event.parentId,
+          parentId: null,
           role: 'system',
           content: `Error: ${event.data.errorType || 'Unknown'} - ${event.data.message || ''}`,
           timestamp: event.timestamp,
         });
+
+      } else if (event.type === 'system.message') {
+        // ── Level 1 system message ────────────────────────────────────
+        messages.push({
+          id: event.id,
+          parentId: null,
+          role: 'system',
+          content: event.data.content || '',
+          timestamp: event.timestamp,
+        });
+
+      } else if (event.type === 'session.model_change') {
+        // ── Level 1 system message for model change ───────────────────
+        const prev = event.data.previousModel || 'unknown';
+        const next = event.data.newModel || model || 'unknown';
+        messages.push({
+          id: event.id,
+          parentId: null,
+          role: 'system',
+          content: `Model changed: ${prev} → ${next}`,
+          timestamp: event.timestamp,
+        });
+
+      } else if (event.type === 'session.info') {
+        // ── Append content into the most recent system message ────────
+        const lastSystemMsg = [...messages].reverse().find(m => m.role === 'system');
+        if (lastSystemMsg) {
+          const extra = event.data.content || '';
+          lastSystemMsg.content = lastSystemMsg.content
+            ? `${lastSystemMsg.content}\n${extra}`
+            : extra;
+        }
       }
     }
 
