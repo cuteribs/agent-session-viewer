@@ -1,5 +1,5 @@
-import { readFileSync } from 'fs';
-import { basename, dirname } from 'path';
+import { readFileSync, existsSync } from 'fs';
+import { basename, dirname, join } from 'path';
 import type {
   CopilotEvent,
   SessionSummary,
@@ -60,7 +60,16 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
     const startEvent = events.find(e => e.type === 'session.start');
     const sessionId = startEvent?.data.sessionId || basename(dirname(filePath));
     const projectPath = startEvent?.data.context?.cwd || dirname(filePath);
-    const project = basename(projectPath);
+    let project = basename(projectPath);
+    // Override with 'name' from workspace.yaml in the session folder
+    const workspaceYamlPath = join(dirname(filePath), 'workspace.yaml');
+    if (existsSync(workspaceYamlPath)) {
+      try {
+        const yaml = readFileSync(workspaceYamlPath, 'utf-8');
+        const m = yaml.match(/^name\s*:\s*(.+)$/m);
+        if (m) project = m[1].trim().replace(/^['"]|['"]$/g, '');
+      } catch { /* ignore */ }
+    }
 
     // Derive initial model from session.start.selectedModel
     let model: string | undefined = startEvent?.data.selectedModel;

@@ -29,6 +29,7 @@ interface ClaudeRawEntry {
   message?: ClaudeCodeEntry['message'];
   subtype?: string;
   durationMs?: number;
+  aiTitle?: string;
   content?: string;
   isMeta?: boolean;
   messageId?: string;
@@ -76,7 +77,8 @@ export function parseClaudeSessionFile(filePath: string): SessionDetail | null {
 
     const sessionId = entries.find(e => e.sessionId)?.sessionId || basename(filePath, '.jsonl');
     const projectPath = decodeProjectPath(dirname(filePath));
-    const project = basename(projectPath);
+    const aiTitle = entries.find(e => e.type === 'ai-title')?.aiTitle;
+    const project = aiTitle || basename(projectPath);
 
     const messages = buildClaudeDisplayMessages(entries);
     const { stats, toolUsage, model, totalTokens } = buildClaudeStats(messages, entries);

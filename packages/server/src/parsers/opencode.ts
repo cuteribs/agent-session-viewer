@@ -211,7 +211,7 @@ function parseDbSession(row: DbSessionRow, messages: Message[], subAgents?: SubA
   return {
     id: row.id,
     source: 'opencode' as const,
-    project: row.directory ? basename(row.directory) : row.project_id,
+    project: row.title || (row.directory ? basename(row.directory) : row.project_id),
     projectPath: row.directory || '',
     startTime,
     lastActivity,
@@ -718,7 +718,7 @@ export function parseOpenCodeSessionFile(filePath: string): SessionDetail | null
     return {
       id: sessionId,
       source: 'opencode',
-      project: session.directory ? basename(session.directory) : session.project_id || 'unknown',
+      project: session.title || (session.directory ? basename(session.directory) : session.project_id || 'unknown'),
       projectPath: session.directory || '',
       startTime,
       lastActivity,
@@ -760,7 +760,7 @@ export function getOpenCodeDbSessionSummary(sessionId: string): SessionSummary |
     return {
       id: row.id,
       source: 'opencode' as const,
-      project: row.directory ? basename(row.directory) : row.project_id,
+      project: row.title || (row.directory ? basename(row.directory) : row.project_id),
       projectPath: row.directory || '',
       startTime: new Date(row.time_created).toISOString(),
       lastActivity: new Date(row.time_updated).toISOString(),
@@ -841,6 +841,7 @@ function readOpenCodeSession(filePath: string): {
   id: string;
   directory?: string;
   project_id?: string;
+  title?: string;
   time: { created: number };
 } | null {
   try {
@@ -849,6 +850,7 @@ function readOpenCodeSession(filePath: string): {
       id: string;
       directory?: string;
       project_id?: string;
+      title?: string;
       time: { created: number };
     };
   } catch {

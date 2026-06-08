@@ -91,14 +91,14 @@ function readDebugLogTokens(
     perRequest[bucket].model = call.model;
   }
 
-  // ── Read per-subagent files: runSubagent-default-call_<toolCallId>.jsonl ──
+  // ── Read per-subagent files: runSubagent-<agentName>-call_<toolCallId>.jsonl ──
   const perSubagent = new Map<string, DebugRequestTokens>();
   let files: string[] = [];
   try { files = readdirSync(debugLogDir); } catch { /* ignore */ }
   for (const fname of files) {
-    const m = fname.match(/^runSubagent-default-(call_.+)\.jsonl$/);
+    const m = fname.match(/^runSubagent-(.+)-(call_[^.]+)\.jsonl$/);
     if (!m) continue;
-    const toolCallId = m[1];
+    const toolCallId = m[2];
     const agg: DebugRequestTokens = { inputTokens: 0, outputTokens: 0, cachedTokens: 0, roundCount: 0 };
     try {
       for (const line of readFileSync(join(debugLogDir, fname), 'utf-8').split('\n')) {
@@ -143,6 +143,8 @@ interface DebugToolCalls {
   main: Map<string, DebugToolCall[]>;
   /** Subagent tool calls, keyed by subagent toolCallId → (tool name → queue) */
   perSubagent: Map<string, Map<string, DebugToolCall[]>>;
+  /** Agent name extracted from filename, keyed by subagent toolCallId */
+  agentNames: Map<string, string>;
 }
 
 function parseDebugToolCallFile(filePath: string): Map<string, DebugToolCall[]> {
@@ -179,7 +181,7 @@ function readDebugLogToolCalls(
   sessionId: string,
   chatSessionsPath: string,
 ): DebugToolCalls {
-  const result: DebugToolCalls = { main: new Map(), perSubagent: new Map() };
+  const result: DebugToolCalls = { main: new Map(), perSubagent: new Map(), agentNames: new Map() };
   const chatSessionsDir = dirname(chatSessionsPath);
   const workspaceDir    = dirname(chatSessionsDir);
   const debugLogDir     = join(workspaceDir, 'GitHub.copilot-chat', 'debug-logs', sessionId);
@@ -190,9 +192,12 @@ function readDebugLogToolCalls(
   let files: string[] = [];
   try { files = readdirSync(debugLogDir); } catch { /* ignore */ }
   for (const fname of files) {
-    const m = fname.match(/^runSubagent-default-(call_.+)\.jsonl$/);
+    const m = fname.match(/^runSubagent-(.+)-(call_[^.]+)\.jsonl$/);
     if (!m) continue;
-    result.perSubagent.set(m[1], parseDebugToolCallFile(join(debugLogDir, fname)));
+    const agentName = m[1];
+    const toolCallId = m[2];
+    result.perSubagent.set(toolCallId, parseDebugToolCallFile(join(debugLogDir, fname)));
+    result.agentNames.set(toolCallId, agentName);
   }
   return result;
 }
@@ -304,6 +309,7 @@ interface VSCodeState {
   version?: number;
   creationDate?: number;
   sessionId?: string;
+  customTitle?: string;
   responderUsername?: string;
   inputState?: {
     selectedModel?: VSCodeModel;
@@ -665,11 +671,12 @@ function buildSession(
         // Detect VSCode subagent invocations
         if (tsd?.kind === 'subagent' && part.toolCallId && !subAgentMap.has(part.toolCallId)) {
           const reqTs = new Date(req.timestamp).toISOString();
+          const agentName = debugToolCalls.agentNames.get(part.toolCallId) ?? tsd.description ?? 'runSubagent';
           subAgentMap.set(part.toolCallId, {
             id: part.toolCallId,
-            agentId: 'runSubagent',
-            agentType: 'runSubagent',
-            agentDisplayName: tsd.description || 'Subagent',
+            agentId: agentName,
+            agentType: agentName,
+            agentDisplayName: tsd.description || agentName,
             description: tsd.description,
             prompt: tsd.prompt,
             status: part.isComplete ? 'completed' : 'started',
@@ -1123,7 +1130,11 @@ function parseVSCodeJsonl(content: string, filePath: string): SessionDetail | nu
   const model = extractModel(state);
   const parsedRequests = extractRequestsJsonl(state);
 
-  return buildSession(parsedRequests, sessionId, filePath, model, state.creationDate);
+  const result = buildSession(parsedRequests, sessionId, filePath, model, state.creationDate);
+  if (result && state.customTitle) {
+    result.project = state.customTitle;
+  }
+  return result;
 }
 
 function parseVSCodeJson(content: string, filePath: string): SessionDetail | null {

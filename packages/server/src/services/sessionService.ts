@@ -1,5 +1,5 @@
 import { readdirSync, statSync, existsSync, openSync, readSync, closeSync } from 'fs';
-import { join, basename, dirname } from 'path';
+import { join, basename, dirname, resolve } from 'path';
 import { getServerConfig } from '../config.js';
 import { parseSessionFile, getSessionSummary, listOpenCodeDbSessionIds, type SessionSource } from '../parsers/index.js';
 import type { SessionSummary, SessionDetail, Message } from '../types/index.js';
@@ -294,7 +294,14 @@ export function getSession(source: SessionSource, sessionId: string): SessionDet
     const filePath = files.get(sessionId);
     if (filePath) {
       const isDbBacked = filePath.startsWith('db::');
-      detail.logFilePath = filePath;
+      if (isDbBacked && source === 'opencode') {
+        const config = getServerConfig();
+        detail.logFilePath = config.paths.opencode.length > 0
+          ? resolve(join(config.paths.opencode[0], '..'))
+          : filePath;
+      } else {
+        detail.logFilePath = filePath;
+      }
       detail.logAvailable = !isDbBacked && existsSync(filePath);
     }
   }
