@@ -26,11 +26,15 @@ export interface CodexEventMsg {
     | 'task_complete'
     | 'token_count'
     | 'patch_apply_end'
-    | 'turn_aborted';
+    | 'turn_aborted'
+    | 'web_search_end'
+    | 'thread_rolled_back';
   // user_message
   message?: string;
   // agent_message
   phase?: 'commentary' | 'final' | 'final_answer';
+  // web_search_end
+  query?: string;
   // task_started
   turn_id?: string;
   model_context_window?: number;
@@ -58,7 +62,7 @@ export interface CodexTokenUsage {
 }
 
 export interface CodexResponseItem {
-  type: 'function_call' | 'function_call_output' | 'custom_tool_call' | 'custom_tool_call_output' | 'message' | 'reasoning';
+  type: 'function_call' | 'function_call_output' | 'custom_tool_call' | 'custom_tool_call_output' | 'message' | 'reasoning' | 'web_search_call' | 'tool_search_call' | 'tool_search_output';
   // function_call / custom_tool_call
   name?: string;
   arguments?: string;
@@ -70,6 +74,9 @@ export interface CodexResponseItem {
   role?: string;
   content?: Array<{ type: string; text?: string }>;
   phase?: string;
+  // web_search_call / tool_search_call
+  status?: string;
+  action?: { type?: string; query?: string; queries?: string[] };
 }
 
 export interface CodexTurnContext {

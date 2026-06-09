@@ -77,11 +77,11 @@ interface PartData {
   reason?: string;
 }
 
-function getDb(): BetterSqlite3 | null {
+function getDb(readonly = true): BetterSqlite3 | null {
   try {
     if (!existsSync(DB_PATH)) return null;
     const Database = _require('better-sqlite3');
-    return new Database(DB_PATH, { readonly: true });
+    return new Database(DB_PATH, { readonly });
   } catch {
     return null;
   }
@@ -841,7 +841,7 @@ export function listOpenCodeDbSessionIds(): string[] {
 export function deleteOpenCodeSession(filePath: string): boolean {
   if (isDbPath(filePath)) {
     const sessionId = filePath.slice(DB_PREFIX.length);
-    const db = getDb();
+    const db = getDb(false); // writable
     if (!db) return false;
     try {
       const result = db.prepare('DELETE FROM session WHERE id = ?').run(sessionId);
