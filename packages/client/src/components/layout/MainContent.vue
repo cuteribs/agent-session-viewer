@@ -20,6 +20,7 @@ const tabs = [
 const session = computed(() => sessionsStore.currentSession)
 const selectedSubAgent = computed(() => sessionsStore.selectedSubAgent)
 const showModels = ref(false)
+const showToolMessages = ref(true)
 
 function handleExport(format: 'csv' | 'json') {
   if (!session.value) return
@@ -194,28 +195,44 @@ function handleExport(format: 'csv' | 'json') {
 
         <!-- Tab navigation -->
         <div data-name="tab-nav" class="px-container-padding border-b border-outline-variant bg-surface shrink-0 z-10">
-          <div class="flex gap-stack-md">
-            <button
-              v-for="tab in tabs"
-              :key="tab.id"
-              :data-name="`tab-${tab.id}`"
-              @click="sessionsStore.setActiveView(tab.id)"
-              :class="[
-                'font-headline-sm text-headline-sm py-3 px-2 flex items-center gap-2 border-b-2 transition-colors',
-                sessionsStore.activeView === tab.id
-                  ? 'text-primary border-primary'
-                  : 'text-on-surface-variant hover:text-on-surface border-transparent'
-              ]"
-            >
-              <span class="material-symbols-outlined" style="font-size:18px">{{ tab.icon }}</span>
-              {{ tab.label }}
-            </button>
+          <div class="flex items-center justify-between">
+            <div class="flex gap-stack-md">
+              <button
+                v-for="tab in tabs"
+                :key="tab.id"
+                :data-name="`tab-${tab.id}`"
+                @click="sessionsStore.setActiveView(tab.id)"
+                :class="[
+                  'font-headline-sm text-headline-sm py-3 px-2 flex items-center gap-2 border-b-2 transition-colors',
+                  sessionsStore.activeView === tab.id
+                    ? 'text-primary border-primary'
+                    : 'text-on-surface-variant hover:text-on-surface border-transparent'
+                ]"
+              >
+                <span class="material-symbols-outlined" style="font-size:18px">{{ tab.icon }}</span>
+                {{ tab.label }}
+              </button>
+            </div>
+            <!-- Timeline-specific controls -->
+            <div v-if="sessionsStore.activeView === 'timeline'" class="flex items-center">
+              <button
+                data-name="toggle-tool-messages"
+                class="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors"
+                :class="showToolMessages
+                  ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                  : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'"
+                @click="showToolMessages = !showToolMessages"
+              >
+                <span class="material-symbols-outlined" style="font-size:14px">settings</span>
+                {{ showToolMessages ? 'Hide Tools' : 'Show Tools' }}
+              </button>
+            </div>
           </div>
         </div>
 
         <!-- Tab content -->
-        <div data-name="tab-content" class="flex-1 overflow-y-auto p-4">
-          <TimelineView v-if="sessionsStore.activeView === 'timeline'" :session="session" />
+        <div data-name="tab-content" class="flex-1 overflow-hidden p-4">
+          <TimelineView v-if="sessionsStore.activeView === 'timeline'" :session="session" :show-tool-messages="showToolMessages" />
           <ChartsView v-else-if="sessionsStore.activeView === 'charts'" :session="session" />
           <LogFileView v-else-if="sessionsStore.activeView === 'logfile'" :session="session" />
         </div>

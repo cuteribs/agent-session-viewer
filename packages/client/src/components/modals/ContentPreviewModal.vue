@@ -229,8 +229,19 @@ onUnmounted(() => {
             <div v-if="message?.content && message?.role !== 'tool'" data-name="message-content" class="message-content whitespace-pre-wrap break-words text-on-surface font-mono">
               {{ message.content }}
             </div>
-            <div v-else-if="!message?.toolResult && message?.role !== 'tool'" class="text-on-surface-variant text-sm italic">
+            <div v-else-if="!message?.toolResult && !message?.error && message?.role !== 'tool'" class="text-on-surface-variant text-sm italic">
               (no content)
+            </div>
+
+            <!-- Error block -->
+            <div v-if="message?.error" class="mt-4 rounded-lg overflow-hidden border border-red-200 dark:border-red-800">
+              <div class="flex items-center gap-2 px-3 py-2 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                <span class="text-sm font-semibold">Error</span>
+              </div>
+              <pre class="p-3 text-xs font-mono text-red-700 dark:text-red-400 overflow-x-auto whitespace-pre-wrap"><code>{{ message.error }}</code></pre>
             </div>
 
             <!-- Tool result -->

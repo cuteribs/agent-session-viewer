@@ -91,11 +91,12 @@ export function formatDuration(ms: number): string {
   return `${seconds}s`;
 }
 
-export function truncateText(text: string, maxLength: number): string {
-  if (text.length <= maxLength) {
-    return text;
+export function truncateText(text: unknown, maxLength: number): string {
+  const str = typeof text === 'string' ? text : String(text ?? '')
+  if (str.length <= maxLength) {
+    return str;
   }
-  return text.slice(0, maxLength - 3) + '...';
+  return str.slice(0, maxLength - 3) + '…';
 }
 
 export function getSourceColor(source: 'claude' | 'copilot' | 'codex' | 'opencode' | 'vscode'): string {
@@ -116,9 +117,9 @@ export function getSourceBgColor(source: 'claude' | 'copilot' | 'codex' | 'openc
 
 export function getRoleColor(role: string, toolSuccess?: boolean): string {
   switch (role) {
-    case 'user':      return '#6b7280';
+    case 'user':      return '#3b8eea';
     case 'assistant': return '#d670d6';
-    case 'system':    return '#3b8eea';
+    case 'system':    return '#6b7280';
     case 'tool':      return toolSuccess === false ? '#ed7580' : '#6bb867';
     default:          return '#6b7280';
   }

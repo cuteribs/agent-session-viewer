@@ -420,6 +420,8 @@ export interface Message {
 
   toolCalls?: ToolCall[];
   toolResult?: ToolResult;
+  /** Error message when the response ended with an error (e.g. opencode finish:'error') */
+  error?: string;
 }
 
 export interface ToolCall {

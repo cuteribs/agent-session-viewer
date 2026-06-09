@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useSessionsStore } from '@/stores/sessions'
 import { formatTime, truncateText, getRoleColor, formatTokens, formatCost } from '@/utils/formatters'
 import type { SessionDetail, Message, ToolCall } from '@/types'
@@ -8,6 +8,10 @@ const props = defineProps<{
   session?: SessionDetail
   /** Override the message list (used when showing subagent message logs). */
   messages?: Message[]
+  /** Override loading state (e.g. when showing subagent message logs). */
+  loading?: boolean
+  /** Whether to show tool-role messages (controlled externally via tab-nav). */
+  showToolMessages?: boolean
 }>()
 
 interface TimelineNode {
@@ -19,10 +23,12 @@ interface TimelineNode {
 
 const sessionsStore = useSessionsStore()
 
+const localLoading = ref(false)
+const isLoading = computed(() => props.loading ?? (sessionsStore.detailLoading || localLoading.value))
+
 const displayMessages = computed(() => props.messages ?? props.session?.messages ?? [])
 
-const messageTree = computed(() => {
-  const messages = displayMessages.value
+function buildMessageTree(messages: Message[]): TimelineNode[] {
   const nodeMap = new Map<string, TimelineNode>()
   const roots: TimelineNode[] = []
 
@@ -43,7 +49,8 @@ const messageTree = computed(() => {
 
     if (message.parentId && nodeMap.has(message.parentId)) {
       const parent = nodeMap.get(message.parentId)
-      if (parent) {
+      // Guard against self-references and cycles (A→B→A)
+      if (parent && message.parentId !== message.id) {
         node.depth = parent.depth + 1
         parent.children.push(node)
         continue
@@ -56,12 +63,15 @@ const messageTree = computed(() => {
   }
 
   return roots.sort((a, b) => a.order - b.order)
-})
+}
 
 function flattenTree(nodes: TimelineNode[]): TimelineNode[] {
   const result: TimelineNode[] = []
+  const visited = new Set<string>()
 
   function visit(node: TimelineNode) {
+    if (visited.has(node.message.id)) return
+    visited.add(node.message.id)
     result.push(node)
     node.children
       .sort((a, b) => a.order - b.order)
@@ -72,16 +82,102 @@ function flattenTree(nodes: TimelineNode[]): TimelineNode[] {
   return result
 }
 
-const flattenedNodes = computed(() => flattenTree(messageTree.value))
+function buildFlattenedNodes(messages: Message[]): TimelineNode[] {
+  return flattenTree(buildMessageTree(messages)).filter(node => {
+    const msg = node.message
+    if (msg.role === 'assistant' && !msg.content && !msg.error) {
+      return false
+    }
+    return true
+  })
+}
+
+// Deferred: show skeleton first, then compute the tree off the render-critical path
+const flattenedNodes = ref<TimelineNode[]>([])
+let pendingTimer: ReturnType<typeof setTimeout> | null = null
+
+// Toggle to show/hide tool messages (driven by parent prop, default true)
+const showToolMessages = computed(() => props.showToolMessages ?? true)
+
+/** Nodes after optional tool-message filtering — used by virtual scroll. */
+const filteredNodes = computed(() => {
+  if (showToolMessages.value) return flattenedNodes.value
+  return flattenedNodes.value.filter(n => n.message.role !== 'tool')
+})
+
+watch(displayMessages, (messages) => {
+  if (pendingTimer !== null) clearTimeout(pendingTimer)
+  if (messages.length === 0) {
+    flattenedNodes.value = []
+    return
+  }
+  localLoading.value = true
+  pendingTimer = setTimeout(() => {
+    flattenedNodes.value = buildFlattenedNodes(messages)
+    localLoading.value = false
+    pendingTimer = null
+  }, 0)
+}, { immediate: true })
+
+// --- Virtual scrolling ---
+const ITEM_HEIGHT = 80 // estimated average height per message card (px)
+const BUFFER_COUNT = 10 // extra items to render above/below viewport
+
+const scrollContainer = ref<HTMLElement | null>(null)
+const scrollTop = ref(0)
+const containerHeight = ref(800)
+
+// Extra bottom space to prevent the virtual-scroll container from being
+// shorter than its absolutely-positioned children (which would cause the
+// scroll position to jump when rendering taller items near the end).
+const totalHeight = computed(() => filteredNodes.value.length * ITEM_HEIGHT + containerHeight.value)
+
+const visibleRange = computed(() => {
+  const start = Math.max(0, Math.floor(scrollTop.value / ITEM_HEIGHT) - BUFFER_COUNT)
+  const visibleCount = Math.ceil(containerHeight.value / ITEM_HEIGHT) + BUFFER_COUNT * 2
+  const end = Math.min(filteredNodes.value.length, start + visibleCount)
+  return { start, end }
+})
+
+const visibleNodes = computed(() =>
+  filteredNodes.value.slice(visibleRange.value.start, visibleRange.value.end)
+)
+
+const offsetTop = computed(() => visibleRange.value.start * ITEM_HEIGHT)
+
+function onScroll() {
+  if (scrollContainer.value) {
+    scrollTop.value = scrollContainer.value.scrollTop
+  }
+}
+
+let resizeObserver: ResizeObserver | null = null
+
+onMounted(() => {
+  if (scrollContainer.value) {
+    containerHeight.value = scrollContainer.value.clientHeight
+    resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        containerHeight.value = entry.contentRect.height
+      }
+    })
+    resizeObserver.observe(scrollContainer.value)
+  }
+})
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+})
 
 // Scroll to selected message when selectedMessageIndex changes
 watch(() => sessionsStore.selectedMessageIndex, async (newIndex) => {
   if (newIndex !== null && newIndex >= 0 && newIndex < displayMessages.value.length) {
     const selectedMessage = displayMessages.value[newIndex]
-    await nextTick()
-    const element = document.querySelector(`[data-message-id="${selectedMessage?.id}"]`)
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    // Find this message's position in flattenedNodes
+    const nodeIndex = filteredNodes.value.findIndex(n => n.message.id === selectedMessage?.id)
+    if (nodeIndex >= 0 && scrollContainer.value) {
+      const targetScroll = nodeIndex * ITEM_HEIGHT - containerHeight.value / 2
+      scrollContainer.value.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' })
     }
   }
 })
@@ -130,11 +226,39 @@ function summarizeArgs(args: Record<string, unknown>, toolName?: string): string
 </script>
 
 <template>
-  <div data-name="timeline-view" class="space-y-3">
-    <div v-for="node in flattenedNodes" :key="node.message.id" :data-message-id="node.message.id"
-      :data-message-index="getDisplayIndex(node.message.id)"
-      :data-name="`message-${node.message.role}-${getDisplayIndex(node.message.id)}`" class="flex items-start gap-3"
-      :style="{ marginLeft: `${node.depth * 22}px` }">
+  <div class="h-full flex flex-col">
+  <div ref="scrollContainer" data-name="timeline-view" class="flex-1 overflow-y-auto" @scroll="onScroll">
+
+    <!-- Skeleton loading state -->
+    <template v-if="isLoading">
+      <div class="space-y-3 p-1">
+        <div v-for="i in 6" :key="i" class="flex items-start gap-3 animate-pulse">
+          <div class="flex-1 bg-surface rounded-lg border border-outline-variant overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-2 bg-surface-container-low">
+              <div class="flex items-center gap-3">
+                <div class="h-3 w-5 rounded bg-surface-container"></div>
+                <div class="h-5 w-16 rounded bg-surface-container"></div>
+                <div :class="['h-3 rounded bg-surface-container', i % 3 === 0 ? 'w-24' : i % 2 === 0 ? 'w-32' : 'w-20']"></div>
+              </div>
+              <div class="h-3 w-12 rounded bg-surface-container"></div>
+            </div>
+            <div class="px-4 py-3">
+              <div :class="['h-3 rounded bg-surface-container mb-2', i % 2 === 0 ? 'w-3/4' : 'w-5/6']"></div>
+              <div :class="['h-3 rounded bg-surface-container', i % 3 === 0 ? 'w-1/2' : 'w-2/3']"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Virtual scrolled list -->
+    <template v-else-if="filteredNodes.length > 0">
+      <div :style="{ height: `${totalHeight}px`, position: 'relative' }">
+        <div :style="{ position: 'absolute', top: `${offsetTop}px`, left: 0, right: 0 }" class="space-y-3 p-1">
+          <div v-for="node in visibleNodes" :key="node.message.id" :data-message-id="node.message.id"
+            :data-message-index="getDisplayIndex(node.message.id)"
+            :data-name="`message-${node.message.role}-${getDisplayIndex(node.message.id)}`" class="flex items-start gap-3"
+            :style="{ marginLeft: `${node.depth * 22}px` }">
       <div :class="[
         'flex-1 bg-surface rounded-lg shadow-sm border transition-all cursor-pointer',
         sessionsStore.selectedMessageIndex === getDisplayIndex(node.message.id)
@@ -199,10 +323,19 @@ function summarizeArgs(args: Record<string, unknown>, toolName?: string): string
             data-name="message-content-text" class="text-sm text-on-surface-variant py-2 font-mono truncate"
             :title="summarizeArgs(node.message.toolCalls[0].arguments, node.message.toolCalls[0].name)">{{
               summarizeArgs(node.message.toolCalls[0].arguments, node.message.toolCalls[0].name) }}</p>
-          <p v-else-if="!node.message.toolCalls?.length && !node.message.toolResult" data-name="message-no-content"
+          <p v-else-if="!node.message.toolCalls?.length && !node.message.toolResult && !node.message.error" data-name="message-no-content"
             class="text-sm text-on-surface-variant italic py-3">
             (no content)
           </p>
+
+          <div v-if="node.message.error" data-name="message-error"
+            class="mb-3 flex items-center gap-1.5 px-2 py-1 rounded bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400">
+            <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            <span class="text-xs font-semibold">Error</span>
+            <span class="text-xs font-mono truncate opacity-80">{{ truncateText(node.message.error, 100) }}</span>
+          </div>
 
           <div v-if="node.message.toolResult" data-name="message-tool-result" :class="[
             'mb-3 rounded border overflow-hidden',
@@ -225,19 +358,19 @@ function summarizeArgs(args: Record<string, unknown>, toolName?: string): string
             </div>
             <p v-if="node.message.toolResult.content"
               class="px-2 py-1 text-xs font-mono text-on-surface-variant truncate">
-              {{
-                node.message.toolResult.content.length > 100
-                  ? node.message.toolResult.content.substring(0, 100) + '…'
-                  : node.message.toolResult.content
-              }}
+              {{ truncateText(node.message.toolResult.content, 100) }}
             </p>
           </div>
         </div>
       </div>
-    </div>
+          </div>
+        </div>
+      </div>
+    </template>
 
-    <div v-if="flattenedNodes.length === 0" data-name="timeline-empty" class="text-center text-on-surface-variant py-8">
-      No messages in this session
+    <div v-if="!isLoading && filteredNodes.length === 0" data-name="timeline-empty" class="text-center text-on-surface-variant py-8">
+      {{ flattenedNodes.length === 0 ? 'No messages in this session' : 'All tool messages are hidden' }}
     </div>
+  </div>
   </div>
 </template>

@@ -64,6 +64,7 @@ interface MsgData {
   agent?: string;
   path?: { cwd: string; root: string };
   finish?: string;
+  error?: string;
 }
 
 interface PartData {
@@ -226,6 +227,15 @@ function parseDbSession(row: DbSessionRow, messages: Message[], subAgents?: SubA
 }
 
 /** Build Message[] for a given session from the DB. */
+interface ToolPartInfo {
+  callID: string;
+  name: string;
+  arguments: Record<string, unknown>;
+  result?: string;
+  success: boolean;
+  timestamp: number;
+}
+
 function buildDbMessages(db: BetterSqlite3, sessionId: string, defaultModel?: string): Message[] {
   const messageRows = db.prepare('SELECT * FROM message WHERE session_id = ? ORDER BY time_created').all(sessionId) as DbMessageRow[];
   const messages: Message[] = [];
@@ -234,6 +244,7 @@ function buildDbMessages(db: BetterSqlite3, sessionId: string, defaultModel?: st
     const msgData: MsgData = JSON.parse(msgRow.data);
     const textParts: string[] = [];
     const toolCalls: ToolCall[] = [];
+    const toolPartInfos: ToolPartInfo[] = [];
 
     const partRows = db.prepare('SELECT * FROM part WHERE message_id = ? ORDER BY time_created').all(msgRow.id) as DbPartRow[];
 
@@ -242,10 +253,23 @@ function buildDbMessages(db: BetterSqlite3, sessionId: string, defaultModel?: st
       if (partData.type === 'text' && partData.text) {
         textParts.push(partData.text);
       } else if (partData.type === 'tool' && partData.tool) {
+        const args = (partData.state?.input as Record<string, unknown>) || {};
+        const output = partData.state?.output as string | undefined;
+        const status = partData.state?.status as string | undefined;
+        const callID = partData.callID || partRow.id;
         toolCalls.push({
-          id: partData.callID || partRow.id,
+          id: callID,
           name: partData.tool,
-          arguments: partData.state?.input as Record<string, unknown> || {},
+          arguments: typeof args === 'object' && !Array.isArray(args) ? args : { value: args },
+          result: output,
+        });
+        toolPartInfos.push({
+          callID,
+          name: partData.tool,
+          arguments: typeof args === 'object' && !Array.isArray(args) ? args : { value: args },
+          result: output,
+          success: status !== 'error',
+          timestamp: partRow.time_created,
         });
       }
     }
@@ -290,6 +314,7 @@ function buildDbMessages(db: BetterSqlite3, sessionId: string, defaultModel?: st
             cost: msgCost,
           },
           toolCalls: hasToolCalls ? toolCalls : undefined,
+          error: msgData.error || undefined,
         });
       } else {
         messages.push({
@@ -300,6 +325,19 @@ function buildDbMessages(db: BetterSqlite3, sessionId: string, defaultModel?: st
           timestamp: new Date(msgData.time?.created || msgRow.time_created).toISOString(),
           model: msgData.modelID || defaultModel,
           toolCalls: hasToolCalls ? toolCalls : undefined,
+          error: msgData.error || undefined,
+        });
+      }
+      // Emit one child tool message per tool call with its result
+      for (const tp of toolPartInfos) {
+        messages.push({
+          id: `${msgRow.id}::tool::${tp.callID}`,
+          parentId: msgRow.id,
+          role: 'tool',
+          content: '',
+          timestamp: new Date(tp.timestamp).toISOString(),
+          toolCalls: [{ id: tp.callID, name: tp.name, arguments: tp.arguments, result: tp.result }],
+          toolResult: { toolCallId: tp.callID, success: tp.success, content: tp.result || '' },
         });
       }
     } else {
@@ -537,6 +575,7 @@ export function parseOpenCodeSessionFile(filePath: string): SessionDetail | null
               cost: msgCost,
             },
             toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+            error: msg.error || undefined,
           });
         } else {
           msgs.push({
@@ -547,8 +586,12 @@ export function parseOpenCodeSessionFile(filePath: string): SessionDetail | null
             timestamp: new Date(msg.time.created).toISOString(),
             model: msg.modelID,
             toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+            error: msg.error || undefined,
           });
         }
+        // Emit one child tool message per tool call with its result
+        const msgTs = new Date(msg.time.created).toISOString();
+        msgs.push(...extractToolMessages(storageRoot, msg.id, msgTs));
       } else {
         msgs.push({
           id: msg.id,
@@ -865,6 +908,7 @@ function loadOpenCodeMessages(storageRoot: string, sessionId: string): {
   modelID?: string;
   tokens?: { input: number; output: number; cache?: { read: number; write: number } };
   time: { created: number };
+  error?: string;
 }[] {
   const messageDir = join(storageRoot, 'message', sessionId);
   if (!existsSync(messageDir)) return [];
@@ -878,6 +922,7 @@ function loadOpenCodeMessages(storageRoot: string, sessionId: string): {
       modelID?: string;
       tokens?: { input: number; output: number; cache?: { read: number; write: number } };
       time: { created: number };
+      error?: string;
     }[] = [];
 
     for (const file of files) {
@@ -890,6 +935,7 @@ function loadOpenCodeMessages(storageRoot: string, sessionId: string): {
           modelID?: string;
           tokens?: { input: number; output: number; cache?: { read: number; write: number } };
           time: { created: number };
+          error?: string;
         };
         messages.push(msg);
       } catch {
@@ -912,6 +958,7 @@ function loadOpenCodeParts(storageRoot: string, messageId: string): {
   callID?: string;
   state?: Record<string, unknown>;
   tokens?: { input: number; output: number; cache?: { read: number; write: number } };
+  time?: { start: number; end: number };
 }[] {
   const partDir = join(storageRoot, 'part', messageId);
   if (!existsSync(partDir)) return [];
@@ -926,6 +973,7 @@ function loadOpenCodeParts(storageRoot: string, messageId: string): {
       callID?: string;
       state?: Record<string, unknown>;
       tokens?: { input: number; output: number; cache?: { read: number; write: number } };
+      time?: { start: number; end: number };
     }[] = [];
 
     for (const file of files) {
@@ -939,6 +987,7 @@ function loadOpenCodeParts(storageRoot: string, messageId: string): {
           callID?: string;
           state?: Record<string, unknown>;
           tokens?: { input: number; output: number; cache?: { read: number; write: number } };
+          time?: { start: number; end: number };
         };
         parts.push(part);
       } catch {
@@ -970,10 +1019,42 @@ function extractToolCallsFromParts(storageRoot: string, messageId: string): Tool
         id: part.callID || part.id,
         name: part.tool,
         arguments: typeof args === 'object' && !Array.isArray(args) ? args as Record<string, unknown> : { value: args },
+        result: typeof part.state.output === 'string' ? part.state.output : undefined,
       });
     }
   }
   return toolCalls;
+}
+
+function extractToolMessages(storageRoot: string, messageId: string, msgTimestamp: string): Message[] {
+  const parts = loadOpenCodeParts(storageRoot, messageId);
+  const toolMessages: Message[] = [];
+  for (const part of parts) {
+    if (part.type === 'tool' && part.tool && part.state) {
+      const args = part.state.input || {};
+      const callID = part.callID || part.id;
+      const output = typeof part.state.output === 'string' ? part.state.output : undefined;
+      const success = part.state.status !== 'error';
+      const ts = part.time?.end
+        ? new Date(part.time.end).toISOString()
+        : msgTimestamp;
+      toolMessages.push({
+        id: `${messageId}::tool::${callID}`,
+        parentId: messageId,
+        role: 'tool',
+        content: '',
+        timestamp: ts,
+        toolCalls: [{
+          id: callID,
+          name: part.tool,
+          arguments: typeof args === 'object' && !Array.isArray(args) ? args as Record<string, unknown> : { value: args },
+          result: output,
+        }],
+        toolResult: { toolCallId: callID, success, content: output ?? '' },
+      });
+    }
+  }
+  return toolMessages;
 }
 
 function extractStepFinishTokens(
