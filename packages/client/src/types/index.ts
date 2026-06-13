@@ -9,7 +9,6 @@ export type {
   ToolUsageSummary,
   SessionStats,
   AppConfig,
-  WSMessage,
   PathsResponse,
 } from 'shared/types'
 

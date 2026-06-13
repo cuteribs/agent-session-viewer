@@ -18,7 +18,7 @@ function getDefaultCodexPath(): string {
 }
 
 function getDefaultOpenCodePath(): string {
-  return join(homedir(), '.local', 'share', 'opencode', 'storage');
+  return join(homedir(), '.local', 'share', 'opencode');
 }
 
 function getDefaultVSCodePath(): string {
@@ -35,8 +35,6 @@ function parsePathList(envValue: string | undefined, defaultPath: string): strin
 export interface ServerConfig {
   port: number;
   host: string;
-  watchEnabled: boolean;
-  watchDebounceMs: number;
   paths: {
     claude: string[];
     copilot: string[];
@@ -50,8 +48,6 @@ export function getServerConfig(): ServerConfig {
   return {
     port: parseInt(process.env.PORT || '3000', 10),
     host: process.env.HOST || 'localhost',
-    watchEnabled: process.env.WATCH_ENABLED === 'true',
-    watchDebounceMs: parseInt(process.env.WATCH_DEBOUNCE_MS || '500', 10),
     paths: {
       claude: parsePathList(process.env.CLAUDE_PATHS, getDefaultClaudePath()),
       copilot: parsePathList(process.env.COPILOT_PATHS, getDefaultCopilotPath()),

@@ -176,7 +176,7 @@ function findVSCodeSessionFiles(basePath: string, files: Map<string, string>): v
 function findOpenCodeSessionFiles(basePath: string, files: Map<string, string>): void {
   // SQLite database (primary source for current sessions)
   try {
-    const dbPath = join(basePath, '..', 'opencode.db');
+    const dbPath = join(basePath, 'opencode.db');
     if (existsSync(dbPath)) {
       const sessionIds = listOpenCodeDbSessionIds();
       for (const sessionId of sessionIds) {
@@ -188,7 +188,7 @@ function findOpenCodeSessionFiles(basePath: string, files: Map<string, string>):
   }
 
   // JSON files (legacy fallback for pre-migration sessions)
-  const sessionDir = join(basePath, 'session');
+  const sessionDir = join(basePath, 'storage', 'session');
   if (!existsSync(sessionDir)) return;
 
   try {
@@ -297,7 +297,7 @@ export function getSession(source: SessionSource, sessionId: string): SessionDet
       if (isDbBacked && source === 'opencode') {
         const config = getServerConfig();
         detail.logFilePath = config.paths.opencode.length > 0
-          ? resolve(join(config.paths.opencode[0], '..'))
+          ? resolve(config.paths.opencode[0])
           : filePath;
       } else {
         detail.logFilePath = filePath;

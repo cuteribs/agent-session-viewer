@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { fetchSessions, fetchSession, deleteSession, fetchWatchStatus, setWatchStatus } from '../utils/api'
-import { useWebSocket } from '../composables/useWebSocket'
+import { fetchSessions, fetchSession, deleteSession } from '../utils/api'
 import type { SessionSummary, SessionDetail, Message, ViewMode, SubAgent } from '../types'
 
 export const useSessionsStore = defineStore('sessions', () => {
@@ -9,7 +8,6 @@ export const useSessionsStore = defineStore('sessions', () => {
   const sessions = ref<SessionSummary[]>([])
   const currentSession = ref<SessionDetail | null>(null)
   const loading = ref(false)
-  /** Separate loading flag for fetching session detail 鈥?does not hide the sidebar list */
   const detailLoading = ref(false)
   const error = ref<string | null>(null)
   const sourceFilter = ref<'all' | 'claude' | 'copilot' | 'codex' | 'opencode' | 'vscode'>(
@@ -20,12 +18,7 @@ export const useSessionsStore = defineStore('sessions', () => {
   const previewMessage = ref<Message | null>(null)
   const showSettings = ref(false)
   const selectedMessageIndex = ref<number | null>(null)
-  const watchEnabled = ref(false)
-  const watchLoading = ref(false)
   const selectedSubAgent = ref<SubAgent | null>(null)
-
-  // WebSocket setup
-  const { connect, onMessage } = useWebSocket()
 
   // Computed
   const filteredSessions = computed(() => {
@@ -76,7 +69,6 @@ export const useSessionsStore = defineStore('sessions', () => {
     return groups
   })
 
-  // "Wilder" sort: alphabetical by session name/project
   const sessionsByName = computed(() => {
     const groups: Record<string, SessionSummary[]> = {}
 
@@ -159,11 +151,9 @@ export const useSessionsStore = defineStore('sessions', () => {
     error.value = null
     try {
       await deleteSession(source, sessionId)
-      // Remove from list
       sessions.value = sessions.value.filter(
         s => !(s.id === sessionId && s.source === source)
       )
-      // Clear current session if it's the deleted one
       if (currentSession.value?.id === sessionId && currentSession.value?.source === source) {
         currentSession.value = null
       }
@@ -188,90 +178,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     selectedSubAgent.value = null
   }
 
-  async function initWatchStatus() {
-    try {
-      const status = await fetchWatchStatus()
-      watchEnabled.value = status.active
-    } catch {
-      // non-critical 鈥?watcher status unknown
-    }
-  }
-
-  async function toggleWatch() {
-    if (watchLoading.value) return
-    watchLoading.value = true
-    try {
-      const status = await setWatchStatus(!watchEnabled.value)
-      watchEnabled.value = status.active
-    } catch (e) {
-      console.error('Failed to toggle watch:', e)
-    } finally {
-      watchLoading.value = false
-    }
-  }
-
-  // WebSocket handlers
-  function initWebSocket() {
-    console.log('Initializing WebSocket connection...')
-    connect()
-    onMessage((msg) => {
-      console.log('WebSocket message received:', msg)
-
-      switch (msg.type) {
-        case 'session_created':
-        case 'session_updated':
-          if (msg.payload.data && msg.payload.sessionId && msg.payload.source) {
-            const index = sessions.value.findIndex(
-              s => s.id === msg.payload.sessionId && s.source === msg.payload.source
-            )
-            if (index >= 0) {
-              sessions.value[index] = msg.payload.data
-            } else {
-              sessions.value.unshift(msg.payload.data)
-            }
-            // Re-sort
-            sessions.value.sort(
-              (a, b) =>
-                new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
-            )
-
-            // Reload current session if it's the one being updated
-            if (
-              currentSession.value &&
-              currentSession.value.id === msg.payload.sessionId &&
-              currentSession.value.source === msg.payload.source
-            ) {
-              console.log('Reloading current session due to update')
-              selectSession(msg.payload.source as 'claude' | 'copilot' | 'codex' | 'opencode' | 'vscode', msg.payload.sessionId)
-            }
-          }
-          break
-        case 'session_deleted':
-          if (msg.payload.sessionId && msg.payload.source) {
-            sessions.value = sessions.value.filter(
-              s => !(s.id === msg.payload.sessionId && s.source === msg.payload.source)
-            )
-            if (
-              currentSession.value?.id === msg.payload.sessionId &&
-              currentSession.value?.source === msg.payload.source
-            ) {
-              currentSession.value = null
-            }
-          }
-          break
-        case 'watch_status':
-          if (typeof msg.payload.active === 'boolean') {
-            watchEnabled.value = msg.payload.active
-          }
-          break
-      }
-    })
-    // Sync initial watcher state from server
-    initWatchStatus()
-  }
-
   return {
-    // State
     sessions,
     currentSession,
     loading,
@@ -283,15 +190,11 @@ export const useSessionsStore = defineStore('sessions', () => {
     previewMessage,
     showSettings,
     selectedMessageIndex,
-    watchEnabled,
-    watchLoading,
     selectedSubAgent,
-    // Computed
     filteredSessions,
     sessionsByDate,
     sessionsByProject,
     sessionsByName,
-    // Actions
     loadSessions,
     selectSession,
     clearCurrentSession,
@@ -302,10 +205,8 @@ export const useSessionsStore = defineStore('sessions', () => {
     closePreview,
     openSettings,
     closeSettings,
-    initWebSocket,
     removeSession,
     selectMessageByIndex,
-    toggleWatch,
     selectSubAgent,
     clearSubAgent,
   }

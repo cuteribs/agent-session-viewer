@@ -14,7 +14,6 @@ const sessionsStore = useSessionsStore()
 onMounted(() => {
   initTheme()
   sessionsStore.loadSessions()
-  sessionsStore.initWebSocket()
 })
 </script>
 

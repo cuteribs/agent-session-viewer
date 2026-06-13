@@ -1,17 +1,20 @@
-import { defineConfig } from 'tsup';
+import { defineConfig } from 'tsdown';
 
 export default defineConfig({
     entry: ['src/index.ts'],
     outDir: './dist',
     format: ['esm'],
     platform: 'node',
+    fixedExtension: false,
     target: 'node20',
-    external: ['open', 'better-sqlite3'],
     clean: true,
-    bundle: true,
-    sourcemap: true,
-    noExternal: ['shared'], // Inline the shared package
+    unbundle: false,
+    sourcemap: false,
     dts: false,
+    deps: {
+        neverBundle: ['open', 'better-sqlite3'],
+        alwaysBundle: ['shared'],
+    },
     banner: {
         js: '#!/usr/bin/env node',
     },

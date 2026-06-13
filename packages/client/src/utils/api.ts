@@ -93,15 +93,3 @@ export async function deleteSession(source: 'claude' | 'copilot' | 'codex' | 'op
     { method: 'DELETE' }
   );
 }
-
-// Realtime watcher API
-export async function fetchWatchStatus() {
-  return fetchJSON<{ active: boolean }>('/watch');
-}
-
-export async function setWatchStatus(active: boolean) {
-  return fetchJSON<{ active: boolean }>('/watch', {
-    method: 'POST',
-    body: JSON.stringify({ active }),
-  });
-}

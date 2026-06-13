@@ -497,20 +497,6 @@ export interface AppConfig {
 }
 
 // ============================================
-// WebSocket Messages
-// ============================================
-
-export interface WSMessage {
-  type: 'session_updated' | 'session_created' | 'session_deleted' | 'watch_status';
-  payload: {
-    source?: 'claude' | 'copilot' | 'codex' | 'opencode' | 'vscode';
-    sessionId?: string;
-    data?: SessionSummary;
-    active?: boolean;
-  };
-}
-
-// ============================================
 // API Response Types
 // ============================================
 

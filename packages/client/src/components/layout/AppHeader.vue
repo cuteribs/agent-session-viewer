@@ -68,17 +68,6 @@ function handleSourceChange(e: Event) {
         <img src="https://img.shields.io/github/stars/cuteribs/agent-session-viewer" alt="GitHub Stars" style="height:25px" />
       </a>
 
-      <!-- Live Monitor toggle -->
-      <!-- <div class="flex items-center gap-2">
-        <span class="font-label-caps text-label-caps text-on-surface-variant hidden sm:block">LIVE</span>
-        <label class="relative inline-flex items-center cursor-pointer">
-          <input type="checkbox" class="sr-only peer" :checked="sessionsStore.watchEnabled"
-            :disabled="sessionsStore.watchLoading" @change="sessionsStore.toggleWatch()" />
-          <div
-            class="w-9 h-5 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary">
-          </div>
-        </label>
-      </div> -->
     </div>
   </header>
 </template>

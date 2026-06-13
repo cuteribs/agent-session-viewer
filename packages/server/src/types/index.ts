@@ -7,8 +7,3 @@ export interface ParsedSession {
   filePath: string;
 }
 
-export interface FileWatchEvent {
-  type: 'add' | 'change' | 'unlink';
-  path: string;
-  source: 'claude' | 'copilot' | 'codex' | 'opencode' | 'vscode';
-}
