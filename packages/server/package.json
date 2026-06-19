@@ -19,7 +19,7 @@
     "build": "npm run build:client && npm run build:server && npm run build:public",
     "build:client": "npm run --prefix ../client build",
     "build:server": "tsdown",
-    "build:public": "copyfiles -u 3 ../client/dist/**/* dist/public",
+    "build:public": "copyfiles -u 3 ../client/dist/* ../client/dist/**/* dist/public",
     "prepublishOnly": "npm run build",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit"

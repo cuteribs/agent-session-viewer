@@ -1,13 +1,30 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { Marked } from 'marked'
 import { useSessionsStore } from '@/stores/sessions'
 import { formatDateTime, formatNumber, formatCost } from '@/utils/formatters'
-import TokenBadge from '@/components/common/TokenBadge.vue'
+
+const markedInstance = new Marked({
+  renderer: {
+    html({ text }) {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+    },
+  },
+})
 
 const sessionsStore = useSessionsStore()
 
 const message = computed(() => sessionsStore.previewMessage)
 const isOpen = computed(() => message.value !== null)
+const showMarkdown = ref(true)
+
+const renderedContent = computed(() => {
+  if (!message.value?.content) return ''
+  return markedInstance.parse(message.value.content) as string
+})
 
 const currentIndex = computed(() => {
   if (!message.value || !sessionsStore.currentSession) return 0
@@ -226,8 +243,9 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div v-if="message?.content && message?.role !== 'tool'" data-name="message-content" class="message-content whitespace-pre-wrap break-words text-on-surface font-mono">
-              {{ message.content }}
+            <div v-if="message?.content && message?.role !== 'tool'" data-name="message-content">
+              <div v-if="showMarkdown" class="message-content" v-html="renderedContent" />
+              <pre v-else class="message-content whitespace-pre-wrap break-words text-on-surface font-mono text-sm">{{ message.content }}</pre>
             </div>
             <div v-else-if="!message?.toolResult && !message?.error && message?.role !== 'tool'" class="text-on-surface-variant text-sm italic">
               (no content)
@@ -291,7 +309,31 @@ onUnmounted(() => {
           </div>
 
           <!-- Footer -->
-          <div class="flex items-center justify-end gap-2 px-4 py-3 border-t border-outline-variant">
+          <div class="flex items-center justify-between gap-2 px-4 py-3 border-t border-outline-variant">
+            <!-- Left: markdown / raw toggle -->
+            <button
+              v-if="message?.content && message?.role !== 'tool'"
+              @click="showMarkdown = !showMarkdown"
+              :title="showMarkdown ? 'Switch to raw text' : 'Switch to markdown'"
+              class="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-surface-container-high hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+            >
+              <template v-if="showMarkdown">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                </svg>
+                Raw
+              </template>
+              <template v-else>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" />
+                </svg>
+                Markdown
+              </template>
+            </button>
+            <span v-else />
+
+            <!-- Right: copy + close -->
+            <div class="flex items-center gap-2">
             <button
               @click="copyContent"
               class="flex items-center gap-1 px-3 py-1.5 text-sm bg-surface-container-high hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
@@ -307,6 +349,7 @@ onUnmounted(() => {
             >
               Close
             </button>
+            </div>
           </div>
         </div>
       </div>
