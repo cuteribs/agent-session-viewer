@@ -191,20 +191,40 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
     });
 
     // ---------------------------------------------------------------
-    // Extract exact session-level totals from session.shutdown
-    // (always the last line in a completed session)
+    // Extract exact session-level totals from session.shutdown.
+    // A resumed session produces one shutdown event per segment, so
+    // accumulate modelMetrics across ALL shutdown events in the file.
     // ---------------------------------------------------------------
-    const rawLastLine = lines[lines.length - 1];
-    let shutdownData: Record<string, {
+    type ShutdownModelEntry = {
       requests: { count: number; cost: number };
       usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; reasoningTokens: number };
-    }> | null = null;
-    try {
-      const parsed = JSON.parse(rawLastLine);
-      if (parsed?.type === 'session.shutdown' && parsed?.data?.modelMetrics) {
-        shutdownData = parsed.data.modelMetrics;
+    };
+    type ShutdownData = Record<string, ShutdownModelEntry>;
+
+    let shutdownData: ShutdownData | null = null;
+    for (const event of events) {
+      if ((event as { type: string }).type !== 'session.shutdown') continue;
+      const metrics = (event as { type: string; data?: { modelMetrics?: ShutdownData } }).data?.modelMetrics;
+      if (!metrics) continue;
+
+      if (!shutdownData) shutdownData = {};
+      for (const modelName of Object.keys(metrics)) {
+        const m = metrics[modelName];
+        if (!shutdownData[modelName]) {
+          shutdownData[modelName] = {
+            requests: { count: 0, cost: 0 },
+            usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 0 },
+          };
+        }
+        shutdownData[modelName].requests.count += m.requests.count;
+        shutdownData[modelName].requests.cost  += m.requests.cost;
+        shutdownData[modelName].usage.inputTokens     += m.usage.inputTokens;
+        shutdownData[modelName].usage.outputTokens    += m.usage.outputTokens;
+        shutdownData[modelName].usage.cacheReadTokens += m.usage.cacheReadTokens;
+        shutdownData[modelName].usage.cacheWriteTokens += m.usage.cacheWriteTokens;
+        shutdownData[modelName].usage.reasoningTokens += m.usage.reasoningTokens;
       }
-    } catch { /* not valid JSON — ignore */ }
+    }
 
     let exactTotalInput = 0;
     let exactTotalOutput = 0;
