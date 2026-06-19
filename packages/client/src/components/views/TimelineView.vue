@@ -268,8 +268,11 @@ function summarizeArgs(args: Record<string, unknown>, toolName?: string): string
         <div data-name="message-header"
           class="flex items-center justify-between px-4 py-2 bg-surface-container-low rounded-t-lg">
           <div class="flex items-center gap-3 min-w-0">
-            <span data-name="message-number" class="text-xs text-on-surface-variant">#{{
-              getDisplayIndex(node.message.id) + 1 }}</span>
+            <span
+              data-name="message-number"
+              class="text-xs text-on-surface-variant"
+              :title="node.message.logLine ? `Log file line ${node.message.logLine}` : undefined"
+            >#{{ node.message.logLine ?? (getDisplayIndex(node.message.id) + 1) }}</span>
             <span data-name="message-role" class="px-2 py-0.5 text-xs font-medium rounded text-white capitalize"
               :style="{ backgroundColor: getRoleColor(node.message.role, node.message.toolResult?.success) }">
               {{ node.message.role }}

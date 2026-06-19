@@ -1,10 +1,42 @@
 import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
+import { parseArgs } from 'util';
 import { getServerConfig } from './config.js';
 import { sessionsRouter } from './routes/sessions.js';
 import { configRouter } from './routes/config.js';
 import { exportRouter } from './routes/export.js';
+
+// ── CLI argument parsing ────────────────────────────────────────────────────
+const { values: argv } = parseArgs({
+  args: process.argv.slice(2),
+  options: {
+    help: { type: 'boolean', short: 'h', default: false },
+    open: { type: 'boolean',              default: false },
+  },
+  strict: false, // tolerate unknown args (e.g. from tsx watch)
+});
+
+if (argv.help) {
+  console.log(`
+Usage: agent-session-viewer [options]
+
+Options:
+  --open        Open the browser automatically after the server starts
+  --help, -h    Show this help message
+
+Environment variables:
+  PORT              Server port          (default: 3000)
+  HOST              Server host          (default: localhost)
+  CLAUDE_PATHS      Comma-separated paths to Claude session directories
+  COPILOT_PATHS     Comma-separated paths to Copilot session directories
+  CODEX_PATHS       Comma-separated paths to Codex session directories
+  OPENCODE_PATHS    Comma-separated paths to OpenCode session directories
+  VSCODE_PATHS      Comma-separated paths to VS Code session directories
+`.trimStart());
+  process.exit(0);
+}
+// ───────────────────────────────────────────────────────────────────────────
 
 const config = getServerConfig();
 const app = express();
@@ -73,12 +105,11 @@ server.listen(config.port, config.host, async () => {
   const url = `http://${config.host}:${config.port}`;
   console.log(`Server running at ${url}`);
 
-  // Open browser if built UI is available
-  if (existsSync(indexHtml)) {
+  // Open browser only when --open is passed and the built UI is available
+  if (argv.open && existsSync(indexHtml)) {
     try {
       const { default: open } = await import('open');
       console.log('Opening browser...');
-      const url = `http://${config.host}:${config.port}`;
       await open(url);
     } catch (err) {
       console.error('Failed to open browser:', err);

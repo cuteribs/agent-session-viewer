@@ -33,6 +33,8 @@ interface ClaudeRawEntry {
   content?: string;
   isMeta?: boolean;
   messageId?: string;
+  /** 1-based line number in the source JSONL file (set during file read). */
+  _lineNumber?: number;
   attachment?: {
     type?: string;
     content?: unknown;
@@ -129,12 +131,16 @@ export function getClaudeSessionSummary(detail: SessionDetail): SessionSummary {
 
 function readClaudeEntries(filePath: string): ClaudeRawEntry[] {
   const content = readFileSync(filePath, 'utf-8');
-  const lines = content.trim().split(/\r?\n/).filter(line => line.trim());
+  const lines = content.split(/\r?\n/);
   const entries: ClaudeRawEntry[] = [];
 
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.trim()) continue;
     try {
-      entries.push(JSON.parse(line) as ClaudeRawEntry);
+      const entry = JSON.parse(line) as ClaudeRawEntry;
+      entry._lineNumber = i + 1;
+      entries.push(entry);
     } catch {
       // Skip malformed lines.
     }
@@ -259,6 +265,7 @@ function buildPromptMessages(
     role: 'user',
     content: extractDisplayText(rootEntry.message.content),
     timestamp: rootEntry.timestamp,
+    logLine: rootEntry._lineNumber,
   };
 
   const assistantEntries = descendants.filter(
@@ -342,6 +349,7 @@ function buildPromptMessages(
     content: assistantContent,
     timestamp: firstAssistant.timestamp,
     model,
+    logLine: firstAssistant._lineNumber,
     tokens: hasTokens
       ? {
           input: totalInput,

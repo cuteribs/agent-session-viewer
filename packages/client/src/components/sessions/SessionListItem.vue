@@ -66,8 +66,21 @@ function cancelDelete() {
       <div class="flex flex-col gap-1">
         <!-- Line 1: Project name + delete button -->
         <div class="flex items-center justify-between gap-1">
-          <div class="font-body-sm text-body-sm font-bold text-on-surface truncate">
-            {{ truncateText(session.project, 28) }}
+          <div class="flex items-center gap-1 min-w-0">
+            <span
+              v-if="session.incomplete"
+              title="Session has no shutdown record — it may have been interrupted or is still in progress. Token counts are estimated."
+              class="flex-shrink-0 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-amber-400/20 text-amber-500 dark:bg-amber-500/20 dark:text-amber-400 cursor-help"
+              style="font-size:9px; line-height:1; font-weight:700;"
+            >!</span>
+            <div
+              :class="[
+                'font-body-sm text-body-sm font-bold truncate',
+                session.incomplete ? 'text-on-surface/50' : 'text-on-surface',
+              ]"
+            >
+              {{ truncateText(session.project, 28) }}
+            </div>
           </div>
           <button
             data-name="session-item-delete"

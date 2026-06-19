@@ -5,6 +5,7 @@ import { useSessionsStore } from '@/stores/sessions'
 import { formatDateTime, formatNumber, formatCost } from '@/utils/formatters'
 
 const markedInstance = new Marked({
+  breaks: true,
   renderer: {
     html({ text }) {
       return text

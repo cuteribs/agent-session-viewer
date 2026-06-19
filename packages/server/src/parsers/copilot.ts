@@ -36,16 +36,22 @@ function getPatchedTokenUsage(event: CopilotEvent): { input: number; output: num
 export function parseCopilotSessionFile(filePath: string): SessionDetail | null {
   try {
     const content = readFileSync(filePath, 'utf-8');
-    const lines = content.trim().split('\n').filter(line => line.trim());
+    const rawLines = content.split('\n');
 
-    if (lines.length === 0) {
+    if (rawLines.every(l => !l.trim())) {
       return null;
     }
 
+    // WeakMap: parsed event object → 1-based line number in the source file
+    const eventLineMap = new WeakMap<object, number>();
     const events: CopilotEvent[] = [];
-    for (const line of lines) {
+    for (let i = 0; i < rawLines.length; i++) {
+      const line = rawLines[i];
+      if (!line.trim()) continue;
       try {
-        events.push(JSON.parse(line));
+        const parsed = JSON.parse(line) as CopilotEvent;
+        events.push(parsed);
+        eventLineMap.set(parsed, i + 1);
       } catch {
         // Skip malformed lines
         continue;
@@ -251,13 +257,11 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
       }
     } else {
       // Fallback: sum outputTokens from all assistant.message events when shutdown is absent
-      for (const line of lines) {
-        try {
-          const ev = JSON.parse(line);
-          if (ev?.type === 'assistant.message' && typeof ev?.data?.outputTokens === 'number') {
-            exactTotalOutput += ev.data.outputTokens;
-          }
-        } catch { /* skip */ }
+      for (const ev of events) {
+        if (ev.type === 'assistant.message') {
+          const out = (ev.data as { outputTokens?: unknown }).outputTokens;
+          if (typeof out === 'number') exactTotalOutput += out;
+        }
       }
     }
 
@@ -281,6 +285,8 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
     const toolMessagesById = new Map<string, Message>(); // toolCallId → Message ref for patching
 
     for (const event of events) {
+      const logLine = eventLineMap.get(event);
+
       if (event.type === 'user.message') {
         const userContent = event.data.content || event.data.transformedContent || '';
         messages.push({
@@ -289,6 +295,7 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
           role: 'user',
           content: userContent,
           timestamp: event.timestamp,
+          logLine,
         });
         lastUserMessageId = event.id;
 
@@ -313,6 +320,7 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
             content: msgContent,
             timestamp: event.timestamp,
             model: subMsgModel,
+            logLine,
             // Per-message output only (exact); cost can be derived by SubAgentView
             tokens: subOutputTok > 0 ? {
               input: 0,
@@ -353,6 +361,7 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
             content: msgContent,
             timestamp: event.timestamp,
             model,
+            logLine,
             tokens: msgTokens,
           });
           lastAssistantMessageId = event.id;
@@ -368,6 +377,7 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
             content: msgContent,
             timestamp: event.timestamp,
             model,
+            logLine,
             tokens: exactOutputTokens > 0 ? {
               input: 0,
               output: exactOutputTokens,
@@ -387,6 +397,7 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
           role: 'tool',
           content: '',
           timestamp: event.timestamp,
+          logLine,
           toolCalls: event.data.toolName ? [{
             id: event.data.toolCallId || event.id,
             name: event.data.toolName,
@@ -475,6 +486,7 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
           content: summary,
           timestamp: event.timestamp,
           subAgentRef: refId,
+          logLine,
           tokens: completionTokens,
         });
 
@@ -485,6 +497,7 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
           role: 'system',
           content: `Error: ${event.data.errorType || 'Unknown'} - ${event.data.message || ''}`,
           timestamp: event.timestamp,
+          logLine,
         });
 
       } else if (event.type === 'system.message') {
@@ -495,6 +508,7 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
           role: 'system',
           content: event.data.content || '',
           timestamp: event.timestamp,
+          logLine,
         });
 
       } else if (event.type === 'session.model_change') {
@@ -507,6 +521,7 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
           role: 'system',
           content: `Model changed: ${prev} → ${next}`,
           timestamp: event.timestamp,
+          logLine,
         });
 
       } else if (event.type === 'session.info') {
@@ -670,6 +685,7 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
       totalTokens: totalTokens > 0 ? totalTokens : undefined,
       model,
       usedModels,
+      incomplete: shutdownData === null ? true : undefined,
       messages,
       stats,
       toolUsage,
@@ -693,5 +709,6 @@ export function getCopilotSessionSummary(detail: SessionDetail): SessionSummary 
     totalTokens: detail.totalTokens,
     model: detail.model,
     subAgentCount: detail.subAgents?.length,
+    incomplete: detail.incomplete,
   };
 }

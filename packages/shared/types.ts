@@ -375,6 +375,11 @@ export interface SessionSummary {
    * e.g. "Session log only: last LLM round per turn; cached and subagent tokens excluded."
    */
   tokenNote?: string;
+  /**
+   * True for copilot sessions whose log file contains no `session.shutdown` event,
+   * meaning the session was interrupted or is still in progress.
+   */
+  incomplete?: boolean;
 }
 
 export interface UsedModelEntry {
@@ -407,6 +412,8 @@ export interface Message {
   content: string;
   timestamp: string;
   model?: string;
+  /** 1-based line number of this message's originating event in the source log file. */
+  logLine?: number;
   /**
    * For role:'system' messages that represent a subagent completion event,
    * this holds the subagent's toolCallId (key in SubAgent.id) so the UI

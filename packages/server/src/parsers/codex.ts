@@ -20,16 +20,22 @@ import { calculateCost } from '../pricing.js';
 export function parseCodexSessionFile(filePath: string): SessionDetail | null {
   try {
     const content = readFileSync(filePath, 'utf-8');
-    const lines = content.trim().split('\n').filter(line => line.trim());
+    const rawLines = content.split('\n');
 
-    if (lines.length === 0) {
+    if (rawLines.every(l => !l.trim())) {
       return null;
     }
 
+    // WeakMap: parsed event object → 1-based line number in the source file
+    const eventLineMap = new WeakMap<object, number>();
     const events: CodexEvent[] = [];
-    for (const line of lines) {
+    for (let i = 0; i < rawLines.length; i++) {
+      const line = rawLines[i];
+      if (!line.trim()) continue;
       try {
-        events.push(JSON.parse(line));
+        const parsed = JSON.parse(line) as CodexEvent;
+        events.push(parsed);
+        eventLineMap.set(parsed, i + 1);
       } catch {
         continue;
       }
@@ -240,6 +246,7 @@ export function parseCodexSessionFile(filePath: string): SessionDetail | null {
 
     for (let i = 0; i < events.length; i++) {
       const event = events[i];
+      const logLine = eventLineMap.get(event);
 
       if (event.type === 'response_item') {
         const item = event.payload as CodexResponseItem;
@@ -259,6 +266,7 @@ export function parseCodexSessionFile(filePath: string): SessionDetail | null {
                 role: 'system',
                 content: text,
                 timestamp: event.timestamp,
+                logLine,
               });
             }
 
@@ -275,6 +283,7 @@ export function parseCodexSessionFile(filePath: string): SessionDetail | null {
                 role: 'system',
                 content: text,
                 timestamp: event.timestamp,
+                logLine,
               });
             } else if (text) {
               flushBuffer();
@@ -286,6 +295,7 @@ export function parseCodexSessionFile(filePath: string): SessionDetail | null {
                 role: 'user',
                 content: text,
                 timestamp: event.timestamp,
+                logLine,
               });
             }
 
@@ -325,6 +335,7 @@ export function parseCodexSessionFile(filePath: string): SessionDetail | null {
               content: text,
               timestamp: event.timestamp,
               model,
+              logLine,
               tokens,
             };
           }
@@ -361,6 +372,7 @@ export function parseCodexSessionFile(filePath: string): SessionDetail | null {
               role: 'tool',
               content: result.content,
               timestamp: event.timestamp,
+              logLine,
               toolResult: result,
               toolCalls: toolInfo
                 ? [{ id: callId, name: toolInfo.name, arguments: toolInfo.args }]
@@ -378,6 +390,7 @@ export function parseCodexSessionFile(filePath: string): SessionDetail | null {
               role: 'tool',
               content: result.content,
               timestamp: event.timestamp,
+              logLine,
               toolResult: result,
               toolCalls: toolInfo
                 ? [{ id: item.call_id, name: toolInfo.name, arguments: toolInfo.args }]
