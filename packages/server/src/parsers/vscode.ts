@@ -252,6 +252,7 @@ interface JsonlEvent {
 interface VSCodeRequest {
   requestId: string;
   timestamp: number;
+  copilotCredits?: number;
   message?: { text?: string; parts?: { text?: string }[] };
   response?: VSCodeResponsePart[];
   result?: VSCodeResult;
@@ -346,6 +347,7 @@ interface VSCodeJsonSession {
 interface VSCodeJsonRequest {
   requestId?: string;
   timestamp?: number;
+  copilotCredits?: number;
   message?: { text?: string; parts?: { text?: string }[] };
   response?: (VSCodeJsonResponsePart | undefined | null)[];
   responseId?: string;
@@ -555,7 +557,7 @@ function extractRequestsJsonl(state: VSCodeState): ParsedRequest[] {
       completionTokens: req.completionTokens,
       promptTokens: req.result?.metadata?.promptTokens,
       resolvedModel: req.result?.resolvedModel || req.result?.modelId,
-      copilotCredits: req.result?.metadata?.copilotCredits,
+      copilotCredits: req.copilotCredits ?? req.result?.metadata?.copilotCredits,
       elapsedMs: req.elapsedMs,
     });
   }
@@ -596,7 +598,7 @@ function extractRequestsJson(session: VSCodeJsonSession): ParsedRequest[] {
       timestamp: req.timestamp || 0,
       userText,
       responseParts: parts,
-      copilotCredits: req.result?.metadata?.copilotCredits,
+      copilotCredits: req.copilotCredits ?? req.result?.metadata?.copilotCredits,
     });
   }
 
@@ -625,8 +627,13 @@ function buildSession(
   let totalOutput = 0;
   let totalCacheRead = 0;
   let totalCost = 0;
-  let hasCostData = false;
   let cumulativeTotal = 0;
+  const credits = parsedRequests
+    .map(req => req.copilotCredits)
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0);
+  const actualCost = credits.length > 0
+    ? credits.reduce((sum, value) => sum + value, 0) * 0.01
+    : undefined;
 
   // Per-model aggregates for usedModels
   const modelAggMap = new Map<string, { input: number; output: number; cacheRead: number; cost: number; count: number }>();
@@ -779,19 +786,16 @@ function buildSession(
     const hasCopilotCredits = typeof copilotCredits === 'number'
       && Number.isFinite(copilotCredits)
       && copilotCredits >= 0;
+    const legacyMsgCost = calculateCost({ input: nonCachedInput, output: outputTokens, cacheRead: cachedTokens }, reqModel);
     const msgCost = hasCopilotCredits
       ? copilotCredits * 0.01
-      : calculateCost({ input: nonCachedInput, output: outputTokens, cacheRead: cachedTokens }, reqModel);
-
-    if (hasCopilotCredits || hasTokenData) {
-      totalCost += msgCost;
-      hasCostData = true;
-    }
+      : legacyMsgCost;
 
     if (hasTokenData) {
       totalOutput    += outputTokens;
       totalInput     += inputTokens;
       totalCacheRead += cachedTokens;
+      totalCost      += legacyMsgCost;
       outputPerMessage.push(outputTokens);
       inputPerMessage.push(inputTokens);
       cumulativeTotal += inputTokens + outputTokens;
@@ -1009,6 +1013,7 @@ function buildSession(
   const subAgents = subAgentMap.size > 0 ? Array.from(subAgentMap.values()) : undefined;
 
   const hasTokens = outputPerMessage.length > 0 || inputPerMessage.length > 0;
+  const sessionCost = actualCost ?? totalCost;
 
   const stats: SessionStats = {
     messageCount: messages.length,
@@ -1020,7 +1025,7 @@ function buildSession(
           totalOutput,
           totalCacheRead,
           totalCacheCreation: 0,
-          totalCost,
+          totalCost: sessionCost,
           inputPerMessage,
           outputPerMessage,
           cumulativeTokens,
@@ -1087,7 +1092,7 @@ function buildSession(
     lastActivity,
     messageCount: messages.length,
     totalTokens,
-    cost: hasCostData ? totalCost : undefined,
+    cost: actualCost !== undefined || hasTokens ? sessionCost : undefined,
     model: modelName,
     usedModels,
     subAgentCount: subAgents?.length,

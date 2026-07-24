@@ -18,6 +18,7 @@ const tabs = [
 ] as const
 
 const session = computed(() => sessionsStore.currentSession)
+const sessionCost = computed(() => session.value?.cost ?? session.value?.stats.tokens?.totalCost)
 const selectedSubAgent = computed(() => sessionsStore.selectedSubAgent)
 const showModels = ref(false)
 const showToolMessages = ref(true)
@@ -192,11 +193,11 @@ function handleExport(format: 'csv' | 'json') {
               <span class="font-code-sm text-code-sm text-on-surface block">{{ formatDateTime(session.startTime) }}</span>
             </div>
             <div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-3">
-              <span class="font-label-caps text-label-caps text-on-surface-variant block mb-1">COST EST.</span>
+              <span class="font-label-caps text-label-caps text-on-surface-variant block mb-1">COST</span>
               <span
-                v-if="session.stats.tokens?.totalCost != null && session.stats.tokens.totalCost > 0"
+                v-if="sessionCost != null && sessionCost > 0"
                 class="font-headline-md text-headline-md text-primary"
-              >{{ formatCost(session.stats.tokens.totalCost) }}</span>
+              >{{ formatCost(sessionCost) }}</span>
               <span v-else class="font-headline-md text-headline-md text-on-surface-variant">—</span>
             </div>
           </div>

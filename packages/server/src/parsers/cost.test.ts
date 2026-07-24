@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { calculateCost, getPricing } from '../pricing.js';
 import { parseCopilotSessionFile } from './copilot.js';
 import { parseVSCodeSessionFile } from './vscode.js';
 
@@ -17,13 +18,15 @@ test('uses VS Code copilotCredits as actual cost', t => {
     requests: [{
       requestId: 'request',
       timestamp: 1,
+      copilotCredits: 1.5,
       message: { text: 'hello' },
       response: [{ value: 'hi' }],
-      result: { metadata: { copilotCredits: 1.5 } },
     }],
   }));
 
-  assert.equal(parseVSCodeSessionFile(file)?.cost, 0.015);
+  const session = parseVSCodeSessionFile(file);
+  assert.equal(session?.cost, 0.015);
+  assert.equal(session?.stats.tokens, undefined);
 });
 
 test('uses the last Copilot totalNanoAiu as actual cost', t => {
@@ -65,4 +68,11 @@ test('falls back to legacy token pricing', t => {
   ].map(event => JSON.stringify(event)).join('\n'));
 
   assert.equal(parseCopilotSessionFile(file)?.cost, 2);
+});
+
+test('uses current GitHub Copilot model pricing', () => {
+  assert.deepEqual(getPricing('GPT-5.6 Sol')?.input, 5);
+  assert.deepEqual(getPricing('Claude Sonnet 5')?.output, 10);
+  assert.deepEqual(getPricing('Gemini 3.6 Flash')?.cachedInput, 0.15);
+  assert.equal(calculateCost({ input: 273_000, output: 1_000_000 }, 'gpt-5.4').toFixed(3), '23.865');
 });
