@@ -298,6 +298,7 @@ interface VSCodeResult {
     promptTokens?: number;
     outputTokens?: number;
     cachedTokens?: number;
+    copilotCredits?: number;
     [key: string]: unknown;
   };
   /** The actual model used for this request turn (may differ from inputState.selectedModel) */
@@ -348,7 +349,7 @@ interface VSCodeJsonRequest {
   message?: { text?: string; parts?: { text?: string }[] };
   response?: (VSCodeJsonResponsePart | undefined | null)[];
   responseId?: string;
-  result?: { timings?: { firstProgress?: number; totalElapsed?: number } };
+  result?: VSCodeResult;
   isCanceled?: boolean;
 }
 
@@ -529,6 +530,7 @@ interface ParsedRequest {
   promptTokens?: number;
   /** Resolved model for this specific request */
   resolvedModel?: string;
+  copilotCredits?: number;
   elapsedMs?: number;
 }
 
@@ -553,6 +555,7 @@ function extractRequestsJsonl(state: VSCodeState): ParsedRequest[] {
       completionTokens: req.completionTokens,
       promptTokens: req.result?.metadata?.promptTokens,
       resolvedModel: req.result?.resolvedModel || req.result?.modelId,
+      copilotCredits: req.result?.metadata?.copilotCredits,
       elapsedMs: req.elapsedMs,
     });
   }
@@ -593,6 +596,7 @@ function extractRequestsJson(session: VSCodeJsonSession): ParsedRequest[] {
       timestamp: req.timestamp || 0,
       userText,
       responseParts: parts,
+      copilotCredits: req.result?.metadata?.copilotCredits,
     });
   }
 
@@ -621,6 +625,7 @@ function buildSession(
   let totalOutput = 0;
   let totalCacheRead = 0;
   let totalCost = 0;
+  let hasCostData = false;
   let cumulativeTotal = 0;
 
   // Per-model aggregates for usedModels
@@ -770,13 +775,23 @@ function buildSession(
     // OpenAI billing model: inputTokens is TOTAL (inclusive of cached).
     // calculateCost expects non-overlapping input + cacheRead, so subtract cached from input.
     const nonCachedInput = dbg ? Math.max(0, inputTokens - cachedTokens) : inputTokens;
-    const msgCost = calculateCost({ input: nonCachedInput, output: outputTokens, cacheRead: cachedTokens }, reqModel);
+    const copilotCredits = req.copilotCredits;
+    const hasCopilotCredits = typeof copilotCredits === 'number'
+      && Number.isFinite(copilotCredits)
+      && copilotCredits >= 0;
+    const msgCost = hasCopilotCredits
+      ? copilotCredits * 0.01
+      : calculateCost({ input: nonCachedInput, output: outputTokens, cacheRead: cachedTokens }, reqModel);
+
+    if (hasCopilotCredits || hasTokenData) {
+      totalCost += msgCost;
+      hasCostData = true;
+    }
 
     if (hasTokenData) {
       totalOutput    += outputTokens;
       totalInput     += inputTokens;
       totalCacheRead += cachedTokens;
-      totalCost      += msgCost;
       outputPerMessage.push(outputTokens);
       inputPerMessage.push(inputTokens);
       cumulativeTotal += inputTokens + outputTokens;
@@ -1072,7 +1087,7 @@ function buildSession(
     lastActivity,
     messageCount: messages.length,
     totalTokens,
-    cost: hasTokens ? totalCost : undefined,
+    cost: hasCostData ? totalCost : undefined,
     model: modelName,
     usedModels,
     subAgentCount: subAgents?.length,

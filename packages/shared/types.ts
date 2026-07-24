@@ -270,6 +270,7 @@ export interface CopilotEvent {
     input_tokens?: number;
     output_tokens?: number;
     cache_read_tokens?: number;
+    totalNanoAiu?: number;
     requestId?: string;
     interactionId?: string;
     turnId?: string;

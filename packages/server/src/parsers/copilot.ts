@@ -237,6 +237,15 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
     let exactTotalCacheRead = 0;
     let exactTotalCacheCreation = 0;
     let exactTotalCost = 0;
+    let totalNanoAiu: number | undefined;
+
+    for (const event of events) {
+      if (typeof event.data.totalNanoAiu === 'number'
+        && Number.isFinite(event.data.totalNanoAiu)
+        && event.data.totalNanoAiu >= 0) {
+        totalNanoAiu = event.data.totalNanoAiu;
+      }
+    }
 
     if (shutdownData) {
       for (const modelName of Object.keys(shutdownData)) {
@@ -615,13 +624,16 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
       cumulativeTokens.push(cumSum);
     }
 
+    const totalCost = totalNanoAiu === undefined
+      ? exactTotalCost
+      : totalNanoAiu / 100_000_000_000;
     const tokenStats = assistantMessages > 0
       ? {
           totalInput: exactTotalInput,
           totalOutput: exactTotalOutput,
           totalCacheRead: exactTotalCacheRead,
           totalCacheCreation: exactTotalCacheCreation,
-          totalCost: exactTotalCost,
+          totalCost,
           inputPerMessage,
           outputPerMessage,
           cumulativeTokens,
@@ -683,6 +695,7 @@ export function parseCopilotSessionFile(filePath: string): SessionDetail | null 
       lastActivity,
       messageCount: messages.length,
       totalTokens: totalTokens > 0 ? totalTokens : undefined,
+      cost: totalCost,
       model,
       usedModels,
       incomplete: shutdownData === null ? true : undefined,
@@ -707,6 +720,7 @@ export function getCopilotSessionSummary(detail: SessionDetail): SessionSummary 
     lastActivity: detail.lastActivity,
     messageCount: detail.messageCount,
     totalTokens: detail.totalTokens,
+    cost: detail.cost,
     model: detail.model,
     subAgentCount: detail.subAgents?.length,
     incomplete: detail.incomplete,
